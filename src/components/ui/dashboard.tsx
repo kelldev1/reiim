@@ -392,7 +392,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onGoToCalendar, className = '' })
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-medium text-muted w-20">Style :</span>
                   <select
-                    value={background.background.shaderStyle}
+                    value={background.shaderStyle}
                     onChange={(e) => setBackground({ shaderStyle: e.target.value as BackgroundShaderStyle })}
                     className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/70 focus:outline-none focus:ring-2 focus:ring-primary/50"
                   >
@@ -410,7 +410,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onGoToCalendar, className = '' })
                     <label className="block text-sm font-medium text-muted mb-1">Couleur principale</label>
                     <input
                       type="color"
-                      value={background.background.color1}
+                      value={background.color1}
                       onChange={(e) => setBackground({ color1: e.target.value })}
                       className="w-12 h-12 rounded-xl border border-white/10 bg-white/5 focus:outline-none focus:ring-2 focus:ring-primary/50"
                     />
@@ -419,7 +419,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onGoToCalendar, className = '' })
                     <label className="block text-sm font-medium text-muted mb-1">Couleur secondaire</label>
                     <input
                       type="color"
-                      value={background.background.color2}
+                      value={background.color2}
                       onChange={(e) => setBackground({ color2: e.target.value })}
                       className="w-12 h-12 rounded-xl border border-white/10 bg-white/5 focus:outline-none focus:ring-2 focus:ring-primary/50"
                     />
@@ -428,7 +428,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onGoToCalendar, className = '' })
                     <label className="block text-sm font-medium text-muted mb-1">Couleur d'accent</label>
                     <input
                       type="color"
-                      value={background.background.color3}
+                      value={background.color3}
                       onChange={(e) => setBackground({ color3: e.target.value })}
                       className="w-12 h-12 rounded-xl border border-white/10 bg-white/5 focus:outline-none focus:ring-2 focus:ring-primary/50"
                     />
@@ -437,7 +437,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onGoToCalendar, className = '' })
                     <label className="block text-sm font-medium text-muted mb-1">Couleur de lumière</label>
                     <input
                       type="color"
-                      value={background.background.color4}
+                      value={background.color4}
                       onChange={(e) => setBackground({ color4: e.target.value })}
                       className="w-12 h-12 rounded-xl border border-white/10 bg-white/5 focus:outline-none focus:ring-2 focus:ring-primary/50"
                     />
@@ -454,7 +454,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onGoToCalendar, className = '' })
                         min="0.5"
                         max="3"
                         step="0.1"
-                        value={background.background.scale}
+                        value={background.scale}
                         onChange={(e) => {
                           const v = parseFloat(e.target.value);
                           if (!isNaN(v)) {
@@ -474,11 +474,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onGoToCalendar, className = '' })
                         min="0"
                         max="2"
                         step="0.05"
-                        value={background.background.distortion}
+                        value={background.distortion}
                         onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) { setBackground({ distortion: v }); } }}
                         className="flex-1 h-1 bg-white/5 rounded-full"
                       />
-                      <span className="text-xs text-muted-soft w-10 text-right">{background.background.distortion.toFixed(2)}</span>
+                      <span className="text-xs text-muted-soft w-10 text-right">{background.distortion.toFixed(2)}</span>
                     </div>
                   </div>
 
@@ -490,11 +490,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onGoToCalendar, className = '' })
                         min="0.1"
                         max="1"
                         step="0.01"
-                        value={background.background.speed}
+                        value={background.speed}
                         onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) { setBackground({ speed: v }); } }}
                         className="flex-1 h-1 bg-white/5 rounded-full"
                       />
-                      <span className="text-xs text-muted-soft w-10 text-right">{background.background.speed.toFixed(2)}</span>
+                      <span className="text-xs text-muted-soft w-10 text-right">{background.speed.toFixed(2)}</span>
                     </div>
                   </div>
 
@@ -506,11 +506,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onGoToCalendar, className = '' })
                         min="0.5"
                         max="3"
                         step="0.1"
-                        value={background.background.intensity}
+                        value={background.intensity}
                         onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) { setBackground({ intensity: v }); } }}
                         className="flex-1 h-1 bg-white/5 rounded-full"
                       />
-                      <span className="text-xs text-muted-soft w-10 text-right">{background.background.intensity.toFixed(1)}</span>
+                      <span className="text-xs text-muted-soft w-10 text-right">{background.intensity.toFixed(1)}</span>
                     </div>
                   </div>
 
@@ -522,11 +522,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onGoToCalendar, className = '' })
                         min="1"
                         max="10"
                         step="1"
-                        value={background.background.detail}
+                        value={background.detail}
                         onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) { setBackground({ detail: v }); } }}
                         className="flex-1 h-1 bg-white/5 rounded-full"
                       />
-                      <span className="text-xs text-muted-soft w-10 text-right">{background.background.detail}</span>
+                      <span className="text-xs text-muted-soft w-10 text-right">{background.detail}</span>
                     </div>
                   </div>
                 </div>
