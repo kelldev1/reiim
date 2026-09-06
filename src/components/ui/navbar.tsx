@@ -1,0 +1,163 @@
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { CalendarDays, LayoutDashboard, Menu, X, Sun, Moon } from 'lucide-react';
+import { useTheme } from '@/lib/theme';
+
+interface NavbarProps {
+  active?: 'dashboard' | 'calendar';
+  onNavigate?: (page: 'dashboard' | 'calendar') => void;
+  className?: string;
+}
+
+const Navbar: React.FC<NavbarProps> = ({
+  active = 'calendar',
+  onNavigate,
+  className = '',
+}) => {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
+
+  const items: { key: 'dashboard' | 'calendar'; label: string; Icon: typeof CalendarDays }[] = [
+    { key: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+    { key: 'calendar', label: 'Calendrier', Icon: CalendarDays },
+  ];
+
+  return (
+    <header
+      className={`relative z-50 w-full ${className}`}
+    >
+      <nav className="relative grid grid-cols-3 items-center w-full px-4 md:px-8 py-3 md:py-4">
+        <div className="flex items-center gap-3">
+          <span className="hidden md:block text-sm font-semibold tracking-wide text-primary">
+            reiim
+          </span>
+        </div>
+
+        <div className="flex justify-center">
+          <ul className="hidden md:flex items-center gap-1 rounded-full ui-chip p-1">
+            {items.map(({ key, label, Icon }) => {
+              const isActive = active === key;
+              return (
+                <li key={key}>
+                  <motion.button
+                    onClick={() => onNavigate?.(key)}
+                    className="relative flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
+                    whileHover={{ y: -1 }}
+                    whileTap={{ y: 0 }}
+                  >
+                    {isActive && (
+                      <motion.span
+                        layoutId="nav-pill"
+                        className="absolute inset-0 rounded-full ui-soft-fill-strong ui-border-strong"
+                        transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                      />
+                    )}
+                    <Icon className="relative z-[1] h-4 w-4 text-primary" />
+                    <span
+                      className={`relative z-[1] ${
+                        isActive ? 'text-primary' : 'text-muted hover:text-primary'
+                      }`}
+                    >
+                      {label}
+                    </span>
+                  </motion.button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        <div className="flex items-center justify-end gap-2">
+          <motion.button
+            onClick={toggleTheme}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            aria-label={theme === 'dark' ? 'Passer au thème clair' : 'Passer au thème sombre'}
+            className="flex h-10 w-28 items-center justify-between px-3 rounded-full ui-chip hover:ui-soft-fill-strong transition-colors"
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              {theme === 'dark' ? (
+                <>
+                  <motion.span
+                    key="sun"
+                    initial={{ opacity: 0, rotate: -40, scale: 0.6 }}
+                    animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                    exit={{ opacity: 0, rotate: 40, scale: 0.6 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex items-center justify-center"
+                  >
+                    <Sun className="h-4 w-4 text-amber-400" />
+                  </motion.span>
+                  <span className="text-sm font-medium text-primary">
+                    Clair
+                  </span>
+                </>
+              ) : (
+                <>
+                  <motion.span
+                    key="moon"
+                    initial={{ opacity: 0, rotate: 40, scale: 0.6 }}
+                    animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                    exit={{ opacity: 0, rotate: -40, scale: 0.6 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex items-center justify-center"
+                  >
+                    <Moon className="h-4 w-4 text-primary" />
+                  </motion.span>
+                  <span className="text-sm font-medium text-primary">
+                    Sombre
+                  </span>
+                </>
+              )}
+            </AnimatePresence>
+          </motion.button>
+
+          <div className="md:hidden">
+            <button
+              className="flex h-9 w-9 items-center justify-center rounded-lg ui-chip text-primary"
+              onClick={() => setMobileOpen((v) => !v)}
+              aria-label="Toggle menu"
+            >
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.ul
+            initial={{ opacity: 0, y: -8, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: -8, height: 0 }}
+            className="md:hidden flex flex-col gap-1 px-4 pb-3"
+          >
+            {items.map(({ key, label, Icon }) => {
+              const isActive = active === key;
+              return (
+                <li key={key}>
+                  <button
+                    onClick={() => {
+                      onNavigate?.(key);
+                      setMobileOpen(false);
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'ui-soft-fill-strong ui-border-strong border text-primary'
+                        : 'text-muted hover:ui-soft-fill hover:text-primary border ui-border'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {label}
+                  </button>
+                </li>
+              );
+            })}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </header>
+  );
+};
+
+export default Navbar;

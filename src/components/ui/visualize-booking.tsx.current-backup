@@ -1,0 +1,299 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { LayoutDashboard, LayoutGrid } from 'lucide-react';
+
+const daysOfWeek = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+
+export type DayType = {
+  day: string;
+  classNames: string;
+};
+
+interface DayProps {
+  classNames: string;
+  day: DayType;
+  onHover: (day: string | null) => void;
+}
+
+const Day: React.FC<DayProps> = ({ classNames, day, onHover }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  return (
+    <motion.div
+      className={`relative flex w-full h-full items-center justify-center ui-soft-fill ui-border border ${classNames}`}
+      style={{ borderRadius: 16, minHeight: '2.5rem' }}
+      onMouseEnter={() => {
+        setIsHovered(true);
+        onHover(day.day);
+      }}
+      onMouseLeave={() => {
+        setIsHovered(false);
+        onHover(null);
+      }}
+      id={`day-${day.day}`}
+      whileHover={{ scale: 1.02 }}
+    >
+      <motion.div
+        className="absolute inset-0 rounded-2xl ui-soft-fill-strong"
+        initial={false}
+        animate={{ opacity: isHovered ? 1 : 0 }}
+        transition={{ duration: 0.15 }}
+      />
+      <motion.div className="relative flex flex-col items-center justify-center z-[1]">
+        {!(day.day[0] === '+' || day.day[0] === '-') && (
+          <span className="text-sm md:text-xl lg:text-2xl text-primary select-none">
+            {day.day}
+          </span>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+};
+
+const CalendarGrid: React.FC<{
+  onHover: (day: string | null) => void;
+  days: DayType[];
+}> = ({ onHover, days }) => {
+  return (
+    <div className="h-full grid grid-cols-7 grid-rows-7 auto-rows-fr gap-1.5 md:gap-2 lg:gap-3">
+      {days.map((day, index) => (
+        <Day
+          key={`${day.day}-${index}`}
+          classNames={day.classNames}
+          day={day}
+          onHover={onHover}
+        />
+      ))}
+    </div>
+  );
+};
+
+const InteractiveCalendar = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => {
+  const [moreView, setMoreView] = useState(false);
+  const [hoveredDay, setHoveredDay] = useState<string | null>(null);
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+
+  const handleDayHover = (day: string | null) => {
+    setHoveredDay(day);
+  };
+
+  // Update the date display
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentDate(new Date());
+    }, 60000); // Update every minute
+    return () => clearInterval(interval);
+  }, []);
+
+  // Format date in French
+  const formattedDate = useMemo(() => {
+    return new Intl.DateTimeFormat('fr-FR', {
+      year: 'numeric',
+      month: 'long'
+    }).format(currentDate);
+  }, [currentDate]);
+
+  // Generate days for the current month with proper padding
+  const generateDays = (date: Date): DayType[] => {
+    const year = date.getFullYear();
+    const month = date.getMonth(); // 0-11
+
+    // First day of the month
+    const firstDay = new Date(year, month, 1);
+    // Last day of the month
+    const lastDay = new Date(year, month + 1, 0);
+
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay(); // 0 (Sunday) to 6 (Saturday)
+
+    const days: DayType[] = [];
+
+    // Add padding days from previous month
+    const prevMonthLastDate = new Date(year, month, 0).getDate();
+    for (let i = startingDayOfWeek; i > 0; i--) {
+      const dayValue = prevMonthLastDate - i + 1;
+      days.push({
+        day: `-${dayValue}`,
+        classNames: 'bg-white/[0.03]'
+      });
+    }
+
+    // Add days of current month
+    for (let day = 1; day <= daysInMonth; day++) {
+      // Highlight today
+      const today = new Date();
+      const isToday =
+        day === today.getDate() &&
+        month === today.getMonth() &&
+        year === today.getFullYear();
+
+      days.push({
+        day: day.toString().padStart(2, '0'),
+        classNames: isToday
+          ? 'bg-white/[0.08] ring-2 ring-white/20'
+          : 'bg-white/[0.06]'
+      });
+    }
+
+    // Add padding days from next month to complete the grid (6 rows x 7 cols = 42 cells)
+    const totalDaysSoFar = days.length;
+    const remainingDays = 42 - totalDaysSoFar;
+
+    for (let i = 1; i <= remainingDays; i++) {
+      days.push({
+        day: `+${i}`,
+        classNames: 'bg-white/[0.03]'
+      });
+    }
+
+    return days;
+  };
+
+  // Generate days for the current date
+  const DAYS = useMemo(() => generateDays(currentDate), [currentDate]);
+
+  const sortedDays = useMemo(() => {
+    return [...DAYS];
+  }, [DAYS]);
+
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        ref={ref}
+        className={`relative w-full h-full flex flex-col lg:flex-row items-stretch gap-4 lg:gap-8 p-3 md:p-6 lg:p-8 ${className ?? ''}`}
+        {...props}
+      >
+        <motion.div layout className="w-full lg:flex-1 lg:max-w-none min-w-0 min-h-0 flex flex-col gap-4 lg:gap-6 flex-shrink-0">
+          <motion.div
+            key="calendar-view"
+            className="flex w-full flex-col gap-4 md:gap-5 h-full"
+          >
+            <div className="flex w-full items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <motion.button
+                  onClick={() => {
+                    setCurrentDate(prev => {
+                      const newDate = new Date(prev);
+                      newDate.setMonth(newDate.getMonth() - 1);
+                      return newDate;
+                    });
+                  }}
+                  className="flex items-center justify-center w-8 h-8 rounded-lg ui-chip hover:ui-soft-fill-strong transition-colors"
+                  aria-label="Mois précédent"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </motion.button>
+                <div className="flex flex-col items-center">
+                  <motion.h2 className="mb-0 md:mb-1 text-2xl md:text-4xl lg:text-5xl font-bold tracking-wider text-primary select-none">
+                    Calendrier
+                  </motion.h2>
+                  <p className="text-sm md:text-base lg:text-xl text-muted select-none">
+                    {formattedDate}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <motion.button
+                  className="relative flex items-center gap-3 rounded-lg ui-chip px-1.5 py-1 text-primary"
+                  onClick={() => setMoreView(!moreView)}
+                  aria-label="Basculer la vue"
+                >
+                  <LayoutDashboard className="h-4 w-4 md:h-5 md:w-5 z-[2]" />
+                  <LayoutGrid className="h-4 w-4 md:h-5 md:w-5 z-[2]" />
+                  <div
+                    className="absolute left-0 top-0 h-[85%] w-7 md:w-8 rounded-md ui-soft-fill-strong ui-border border transition-transform duration-300"
+                    style={{
+                      top: '50%',
+                      transform: moreView
+                        ? 'translateY(-50%) translateX(44px)'
+                        : 'translateY(-50%) translateX(4px)',
+                    }}
+                  />
+                </motion.button>
+                <motion.button
+                  onClick={() => {
+                    setCurrentDate(prev => {
+                      const newDate = new Date(prev);
+                      newDate.setMonth(newDate.getMonth() + 1);
+                      return newDate;
+                    });
+                  }}
+                  className="flex items-center justify-center w-8 h-8 rounded-lg ui-chip hover:ui-soft-fill-strong transition-colors"
+                  aria-label="Mois suivant"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </motion.button>
+              </div>
+            </div>
+            <div className="grid grid-cols-7 gap-1.5 md:gap-2 lg:gap-3 flex-shrink-0">
+              {daysOfWeek.map((day) => (
+                <div
+                  key={day}
+                  className="rounded-xl ui-soft-fill-strong py-1.5 md:py-2 text-center text-[11px] md:text-sm font-semibold tracking-wider text-primary select-none"
+                >
+                  {day}
+                </div>
+              ))}
+            </div>
+            <div className="flex-1 min-h-0 min-w-0 flex-shrink">
+              <CalendarGrid onHover={handleDayHover} days={sortedDays} />
+            </div>
+          </motion.div>
+        </motion.div>
+
+        {moreView && (
+          <motion.div
+            className="w-full lg:flex-1 lg:max-w-none min-w-0 min-h-0 flex flex-col gap-4 lg:gap-6 flex-shrink-0"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <motion.div
+              key="more-view"
+              className="mt-0 md:mt-4 flex w-full flex-col gap-4 h-full"
+            >
+              <div className="flex w-full flex-col items-start justify-between gap-1 flex-shrink-0">
+                <motion.h2 className="mb-0 md:mb-1 text-2xl md:text-4xl lg:text-5xl font-bold tracking-wider text-primary select-none">
+                  Liste
+                </motion.h2>
+                <p className="font-medium text-muted text-xs md:text-sm">
+                  Aucun élément à afficher
+                </p>
+              </div>
+              <motion.div
+                className="flex-1 min-h-0 flex flex-col items-start justify-start overflow-hidden rounded-xl ui-border border ui-card"
+                layout
+              >
+                <AnimatePresence>
+                  <motion.div
+                    className="w-full h-full flex items-center justify-center"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <div className="flex flex-col items-center gap-2 px-6 text-center">
+                      <div className="h-10 w-10 rounded-full ui-border border ui-soft-fill" />
+                      <p className="text-sm md:text-base text-muted">
+                        Aucune donnée
+                      </p>
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        )}
+      </motion.div>
+    </AnimatePresence>
+  );
+});
+InteractiveCalendar.displayName = 'InteractiveCalendar';
+
+export default InteractiveCalendar;

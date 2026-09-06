@@ -1,0 +1,180 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* base palette (kept for compatibility) */
+    --color-bg: 255 247 243;
+    --color-fg: 62 38 30;
+    --color-surface: 255 255 255;
+    --color-surface-muted: 255 255 255;
+    --color-border: 255 255 255;
+    --color-border-strong: 255 255 255;
+    --color-card: 255 255 255;
+    --color-card-border: 255 255 255;
+    --color-muted: 148 118 102;
+    --color-muted-soft: 174 148 134;
+    --color-accent1: 255 177 163;
+    --color-accent2: 255 139 133;
+    --color-accent3: 92 184 132;
+    --color-accent4: 154 216 167;
+    --color-primary: 196 96 82;
+    --color-secondary: 84 168 118;
+
+    /* tailwind semantic tokens */
+    --background: 24 100% 98%;
+    --foreground: 20 30% 16%;
+    --card: 24 100% 98%;
+    --card-foreground: 20 30% 16%;
+    --primary: 20 30% 16%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 20 14% 90%;
+    --secondary-foreground: 20 30% 16%;
+    --muted: 20 14% 90%;
+    --muted-foreground: 20 8% 45%;
+    --accent: 20 14% 90%;
+    --accent-foreground: 20 30% 16%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 20 14% 86%;
+    --input: 20 14% 86%;
+    --ring: 20 30% 16%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --color-bg: 5 3 13;
+    --color-fg: 250 250 255;
+    --color-surface: 24 20 36;
+    --color-surface-muted: 18 14 28;
+    --color-border: 255 255 255;
+    --color-border-strong: 255 255 255;
+    --color-card: 255 255 255;
+    --color-card-border: 255 255 255;
+    --color-muted: 164 155 184;
+    --color-muted-soft: 128 118 150;
+    --color-accent1: 75 43 217;
+    --color-accent2: 30 130 255;
+    --color-accent3: 139 92 246;
+    --color-accent4: 184 168 255;
+    --color-primary: 139 92 246;
+    --color-secondary: 30 130 255;
+
+    --background: 258 50% 3%;
+    --foreground: 0 0% 96%;
+    --card: 257 30% 9%;
+    --card-foreground: 0 0% 96%;
+    --primary: 0 0% 92%;
+    --primary-foreground: 258 50% 3%;
+    --secondary: 257 20% 12%;
+    --secondary-foreground: 0 0% 92%;
+    --muted: 257 20% 12%;
+    --muted-foreground: 0 0% 70%;
+    --accent: 257 20% 12%;
+    --accent-foreground: 0 0% 92%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 100% / 0.08;
+    --input: 0 0% 100% / 0.08;
+    --ring: 0 0% 92%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  .light * {
+    border-color: rgba(60, 30, 20, 0.12);
+  }
+  html,
+  body {
+    background-color: hsl(var(--color-bg));
+    color: hsl(var(--color-fg));
+    color-scheme: dark light;
+  }
+}
+
+@layer components {
+  .ui-card {
+    background-color: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+  .light .ui-card {
+    background-color: rgba(255, 255, 255, 0.3);
+    border: 1px solid rgba(120, 60, 40, 0.12);
+  }
+
+  .ui-chip {
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.72);
+  }
+  .light .ui-chip {
+    background-color: rgba(255, 255, 255, 0.45);
+    border: 1px solid rgba(120, 60, 40, 0.12);
+    color: rgba(62, 38, 30, 0.72);
+  }
+
+  .ui-soft-fill {
+    background-color: rgba(255, 255, 255, 0.03);
+  }
+  .light .ui-soft-fill {
+    background-color: rgba(255, 255, 255, 0.3);
+  }
+
+  .ui-soft-fill-strong {
+    background-color: rgba(255, 255, 255, 0.06);
+  }
+  .light .ui-soft-fill-strong {
+    background-color: rgba(255, 255, 255, 0.5);
+  }
+
+  .ui-border {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  .light .ui-border {
+    border-color: rgba(120, 60, 40, 0.12);
+  }
+
+  .ui-border-strong {
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+  .light .ui-border-strong {
+    border-color: rgba(120, 60, 40, 0.2);
+  }
+}
+
+@layer utilities {
+  .text-primary {
+    color: rgba(255, 255, 255, 0.82);
+  }
+  .light .text-primary {
+    color: rgba(42, 24, 18, 0.82);
+  }
+
+  .text-muted {
+    color: rgba(255, 255, 255, 0.5);
+  }
+  .light .text-muted {
+    color: rgba(62, 38, 30, 0.55);
+  }
+
+  .text-muted-soft {
+    color: rgba(255, 255, 255, 0.36);
+  }
+  .light .text-muted-soft {
+    color: rgba(62, 38, 30, 0.42);
+  }
+
+  .hover\:text-primary:hover {
+    color: rgba(255, 255, 255, 0.82);
+  }
+  .light .hover\:text-primary:hover {
+    color: rgba(42, 24, 18, 0.82);
+  }
+}
