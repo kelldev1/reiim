@@ -11,6 +11,15 @@ vite.err.txt
 *.log
 npm-debug.log*
 
+# env / secrets
+.env
+.env.local
+.env.*.local
+
+# supabase
+supabase/.branches/
+supabase/.temp/
+
 # editor / OS
 .DS_Store
 *.local
