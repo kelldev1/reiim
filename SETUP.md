@@ -10,12 +10,13 @@ Architecture : le navigateur ne parle jamais au modèle. Il passe par une **Edge
 limite le débit.
 
 ```
-React  →  Edge Function "ai"  →  API Anthropic (Claude Sonnet 5)
+React  →  Edge Function "ai"  →  API Anthropic (Claude Opus 5)
           (clé API ICI, jamais dans le bundle)
 ```
 
-Modèle : **Claude Sonnet 5** (`claude-sonnet-5`). Réglable dans
-`supabase/functions/ai/index.ts` : `MODEL` (ex. `claude-opus-5` plus puissant),
+Modèle : **Claude Opus 5** (`claude-opus-5`, effort `high`) — le plus fort en maths.
+Repasser à `claude-sonnet-5` (2,5× moins cher) si le coût prime. Réglable dans
+`supabase/functions/ai/index.ts` : `MODEL`,
 `EFFORT` (`low`→`max`), `MAX_TOKENS`. Le secret reste `LLM_API_KEY`.
 
 ---
@@ -51,8 +52,8 @@ npx supabase db push
 
 ## 4. Clé du modèle (secret de la fonction)
 
-1. **console.anthropic.com → Billing** : ajouter du crédit (5 € suffisent pour tester —
-   ~500 devoirs).
+1. **console.anthropic.com → Billing** : ajouter du crédit (5 € ≈ ~150 devoirs avec Opus,
+   ~400 avec Sonnet).
 2. **console.anthropic.com → API keys** : créer une clé (`sk-ant-…`).
 3. La poser comme secret de la fonction :
 
@@ -83,7 +84,7 @@ npx supabase functions deploy ai --project-ref qfnekebcpapprfhjqrry --use-api
 
 ## 7. Coûts & limites
 
-- **Claude Sonnet 5** : ~2 $/1M tokens entrée, ~10 $/1M sortie. Un devoir ≈ 1–3 c.
+- **Claude Opus 5** : ~5 $/1M entrée, ~25 $/1M sortie. Un devoir ≈ 3–8 c. (Sonnet 5 = 2,5× moins cher.)
 - Le proxy limite par **crédit** (5 offerts) + **rate-limit** 1 req/5 s par utilisateur.
 - **console.anthropic.com → Limits** : fixer un plafond de dépense mensuel.
 
@@ -96,7 +97,7 @@ npm run dev
 1. Crée un compte → tu arrives sur le dashboard (5 crédits offerts).
 2. Onglet **Calendrier** → glisse « Nouveau devoir » sur un jour.
 3. Matière + méthode **« Exercices pratiques »** → **Planifier**.
-4. Colle un énoncé → **« M'aider à le faire »**. Ça consomme 1 crédit.
+4. Colle un énoncé → **« Faire le devoir »**. Ça consomme 1 crédit.
 
 Pour te redonner des crédits pendant les tests, dans le **SQL Editor** de Supabase :
 

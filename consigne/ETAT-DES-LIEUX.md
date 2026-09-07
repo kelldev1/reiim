@@ -89,10 +89,12 @@ indexés par jour × slot méthode.
 - `supabase/migrations/20260907120000_init.sql` : tables `profiles` + `ai_usage`, RLS,
   triggers, fonctions `deduct_ai_credit` / `refund_ai_credit`. **Exécutée.**
 - `supabase/functions/ai/index.ts` : proxy Edge Function. Vérifie JWT → rate-limit
-  1 req/5 s → débite 1 crédit (atomique, remboursé si échec) → **Claude Sonnet 5**
-  (`claude-sonnet-5`, effort `medium`, `max_tokens` 4000, prompt système caché,
-  SDK `npm:@anthropic-ai/sdk@0.124.0`) → logue les tokens. **La clé API vit uniquement là**
-  (secret `LLM_API_KEY`).
+  1 req/5 s → débite 1 crédit (atomique, remboursé si échec) → **Claude Opus 5**
+  (`claude-opus-5`, effort `high`, `max_tokens` 8000, prompt système avec exigence de
+  vérification des calculs, SDK `npm:@anthropic-ai/sdk@0.124.0`) → logue les tokens.
+  Accepte un PDF (`document` block). **La clé API vit uniquement là** (secret `LLM_API_KEY`).
+  Passé de sonnet-5/medium → opus-5/high le 2026-09-07 soir (réponses sonnet jugées fausses
+  sur un devoir de maths avancé). Coût ≈ 3–8 c/devoir. Réglable : `MODEL` / `EFFORT`.
 - `src/lib/supabase.ts` (client), `src/lib/ai.ts` (`askAI()` — ajoute l'entête `apikey`).
 - `SETUP.md` à la racine = la marche à suivre.
 

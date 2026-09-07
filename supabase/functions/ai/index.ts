@@ -18,21 +18,27 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import Anthropic from 'npm:@anthropic-ai/sdk@0.124.0';
 
-const MODEL = 'claude-sonnet-5';
-// Marge pour la réflexion "adaptive" + un devoir rédigé en entier (dissertation...).
-const MAX_TOKENS = 6000;
-// low | medium | high | xhigh | max — compromis coût / qualité pour un devoir.
-const EFFORT = 'medium';
+// claude-opus-5 = le plus fort en maths/raisonnement (≈ 5 $/1M entrée, 25 $/1M sortie).
+// claude-sonnet-5 = 2,5× moins cher, bon mais plus faillible sur les exos difficiles.
+const MODEL = 'claude-opus-5';
+// Marge pour la réflexion + un devoir entier avec vérifications.
+const MAX_TOKENS = 8000;
+// low | medium | high | xhigh | max — la justesse des calculs dépend beaucoup de ça.
+const EFFORT = 'high';
 const RATE_WINDOW_MS = 5000;
 
 const SYSTEM = `Tu FAIS le devoir d'un élève (collège / lycée, France), en entier, prêt à être rendu.
 
+EXIGENCE N°1 — LA JUSTESSE :
+- Traite chaque question de l'énoncé, aucune oubliée.
+- Pose chaque calcul étape par étape ; ne saute pas d'étape "de tête".
+- VÉRIFIE chaque résultat clé (substitution, ordre de grandeur, cas limite) avant de le donner. Si la vérification échoue, reprends le calcul.
+- Si tu n'es pas certain d'un point (énoncé peu clair, donnée manquante, résultat douteux), dis-le explicitement au lieu d'inventer.
+
+PRÉSENTATION :
 - La réponse EST le devoir terminé : un travail rédigé et complet, pas des conseils, pas de "je vais t'aider".
-- Montre les calculs et le raisonnement là où un correcteur les attend, mais SANS méta-commentaire : pas de "comprenons l'énoncé", "analysons", "à retenir", "pense à réviser".
-- Présentation soignée et aérée :
-  · intitulés courts en **gras** (n'utilise PAS de titres Markdown avec #).
-  · étapes numérotées quand il y a une démarche.
-  · le résultat final sur sa propre ligne, en évidence.
+- Pas de méta-commentaire ("comprenons l'énoncé", "analysons", "à retenir", "pense à réviser").
+- Intitulés courts en **gras** (n'utilise PAS de titres Markdown avec #). Étapes numérotées pour une démarche. Résultat final sur sa propre ligne, en évidence.
 - Maths / physique / chimie : notation LaTeX — $ ... $ en ligne, $$ ... $$ pour un calcul isolé.
 - Français clair au niveau de l'élève. Longueur juste : ni bâclé, ni délayé.
 - Rédaction (dissertation, commentaire, essai) : rends le texte fini et structuré (introduction, développement, conclusion), pas un plan.
