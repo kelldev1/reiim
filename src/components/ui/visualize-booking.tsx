@@ -1,12 +1,86 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, LayoutGrid } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { LayoutDashboard, LayoutGrid, GripVertical, Trash2 } from 'lucide-react';
+import { MethodWorkspace } from '@/components/ui/method-workspaces';
 
 const daysOfWeek = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 
+export interface Selection {
+  subject: string;
+  methods: string[];
+}
+export type Selections = Record<string, Selection>;
+
+const STORAGE_KEY = 'reiim-learning-selections';
+
+export const SUBJECTS = [
+  { value: 'mathématiques', label: 'Mathématiques', color: '#3b82f6' },
+  { value: 'physique', label: 'Physique', color: '#ef4444' },
+  { value: 'chimie', label: 'Chimie', color: '#10b981' },
+  { value: 'biologie', label: 'Biologie', color: '#8b5cf6' },
+  { value: 'histoire', label: 'Histoire', color: '#f59e0b' },
+  { value: 'géographie', label: 'Géographie', color: '#06b6d4' },
+  { value: 'langues', label: 'Langues', color: '#ec4899' },
+  { value: 'programmation', label: 'Programmation', color: '#6366f1' },
+  { value: 'philosophie', label: 'Philosophie', color: '#84cc16' },
+  { value: 'littérature', label: 'Littérature', color: '#f97316' },
+  { value: 'art', label: 'Art & Musique', color: '#d946ef' },
+  { value: 'sport', label: 'Éducation physique', color: '#14b8a6' },
+] as const;
+
+export const METHODS = [
+  { value: 'vidéos', label: 'Vidéos explicatives' },
+  { value: 'exercices', label: 'Exercices pratiques' },
+  { value: 'lecture', label: 'Lecture & notes' },
+  { value: 'projets', label: 'Projets concrets' },
+  { value: 'discussion', label: 'Étude en groupe' },
+  { value: 'flashcards', label: 'Flashcards & mémorisation' },
+  { value: 'mindmap', label: 'Cartes mentales' },
+  { value: 'podcast', label: 'Podcasts & audio' },
+  { value: 'simulation', label: 'Simulations & labos' },
+  { value: 'lecture_active', label: 'Lecture active & synthèse' },
+] as const;
+
+const subjectMeta = (v: string) => SUBJECTS.find((s) => s.value === v);
+const methodLabel = (v: string) => METHODS.find((m) => m.value === v)?.label ?? v;
+
+const keyFor = (year: number, month: number, day: string) => `${year}-${month + 1}-${day}`;
+
+const readSelections = (): Selections => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<
+      string,
+      { subject?: string; method?: string; methods?: string[] }
+    >;
+    const out: Selections = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      const methods = v.methods ?? (v.method ? [v.method] : []);
+      if (v.subject && methods.length) out[k] = { subject: v.subject, methods };
+    }
+    return out;
+  } catch {
+    return {};
+  }
+};
+const writeSelections = (s: Selections) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+  } catch {
+    /* ignore */
+  }
+};
+
+const DND_MIME = 'text/plain';
+const DND_NEW = 'reiim:new';
+const DND_MOVE = 'reiim:move:';
+
 export type DayType = {
   day: string;
-  classNames: string;
+  classNames?: string;
+  isToday?: boolean;
+  selection?: Selection;
   meetingInfo?: {
     date: string;
     time: string;
@@ -17,352 +91,550 @@ export type DayType = {
 };
 
 interface DayProps {
-  classNames: string;
   day: DayType;
-  onHover: (day: string | null) => void;
-  onClick: (day: string) => void;
+  dragActive: boolean;
+  onOpen: (day: string) => void;
+  onDropNew: (day: string) => void;
+  onMove: (from: string, to: string) => void;
 }
 
-const Day: React.FC<DayProps> = ({ classNames, day, onHover, onClick }) => {
-  const [isHovered, setIsHovered] = useState(false);
+const Day: React.FC<DayProps> = ({ day, dragActive, onOpen, onDropNew, onMove }) => {
+  const isPadding = day.day.startsWith('-') || day.day.startsWith('+');
+  const [over, setOver] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const sub = day.selection ? subjectMeta(day.selection.subject) : undefined;
+
+  const bg = over
+    ? 'rgb(var(--color-fg) / 0.16)'
+    : isPadding
+      ? 'rgb(var(--color-fg) / 0.02)'
+      : day.isToday
+        ? 'rgb(var(--color-fg) / 0.10)'
+        : hovered
+          ? 'rgb(var(--color-fg) / 0.09)'
+          : 'rgb(var(--color-fg) / 0.05)';
+
+  const ring = over
+    ? 'inset 0 0 0 2px rgb(var(--color-fg) / 0.55)'
+    : day.isToday
+      ? 'inset 0 0 0 2px rgb(var(--color-fg) / 0.35)'
+      : dragActive && !isPadding
+        ? 'inset 0 0 0 1px rgb(var(--color-fg) / 0.3)'
+        : 'inset 0 0 0 1px rgb(var(--color-fg) / 0.06)';
+
+  const dropHandlers = isPadding
+    ? {}
+    : {
+        onDragEnter: (e: React.DragEvent) => {
+          e.preventDefault();
+          setOver(true);
+        },
+        onDragOver: (e: React.DragEvent) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        },
+        onDragLeave: (e: React.DragEvent) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false);
+        },
+        onDrop: (e: React.DragEvent) => {
+          e.preventDefault();
+          setOver(false);
+          const data = e.dataTransfer.getData(DND_MIME);
+          if (data === DND_NEW) onDropNew(day.day);
+          else if (data.startsWith(DND_MOVE)) {
+            const from = data.slice(DND_MOVE.length);
+            if (from !== day.day) onMove(from, day.day);
+          }
+        },
+      };
+
   return (
     <motion.div
-      className={`relative flex w-full h-full items-center justify-center ${classNames}`}
-      style={{ borderRadius: 16, minHeight: '2.5rem' }}
-      onClick={() => {
-        // Only trigger click on actual day numbers (not padding days)
-        if (!day.day.startsWith('-') && !day.day.startsWith('+')) {
-          onClick(day.day);
-        }
+      className={`relative flex w-full h-full items-center justify-center overflow-hidden ${
+        isPadding ? '' : 'cursor-pointer'
+      }`}
+      style={{
+        borderRadius: 16,
+        minHeight: '2.75rem',
+        backgroundColor: bg,
+        boxShadow: ring,
+        transition: 'background-color .15s ease, box-shadow .15s ease',
       }}
-      id={`day-${day.day}`}
-      whileHover={{ scale: 1.02 }}
-      >
-      {!day.day.startsWith('-') && !day.day.startsWith('+') && (
-        <span className="text-sm md:text-xl lg:text-2xl text-primary select-none">
-          {day.day}
-        </span>
-      )
-      }
-      {day.meetingInfo && (
-        <motion.div
-          className="absolute bottom-2 right-2 flex items-center text-primary font-medium bg-transparent"
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          exit={{ scale: 0 }}
-          transition={{ duration: 0.2 }}
+      onClick={() => {
+        if (!isPadding) onOpen(day.day);
+      }}
+      onHoverStart={() => setHovered(true)}
+      onHoverEnd={() => setHovered(false)}
+      {...dropHandlers}
+      initial="rest"
+      animate="rest"
+      whileHover={isPadding ? undefined : 'hover'}
+      variants={{ rest: { y: 0 }, hover: { y: -2 } }}
+      transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+    >
+      {!isPadding &&
+        (day.selection ? (
+          <span className="pointer-events-none absolute left-2 top-1.5 text-xs font-medium text-primary select-none md:text-sm">
+            {day.day}
+          </span>
+        ) : (
+          <motion.span
+            className="pointer-events-none relative z-[1] text-sm font-medium text-primary select-none md:text-xl lg:text-2xl"
+            variants={{ rest: { scale: 1 }, hover: { scale: 1.16 } }}
+            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+          >
+            {day.day}
+          </motion.span>
+        ))}
+
+      {!isPadding && day.selection && (
+        <div
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.setData(DND_MIME, `${DND_MOVE}${day.day}`);
+            e.dataTransfer.effectAllowed = 'move';
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen(day.day);
+          }}
+          title={`${sub?.label ?? day.selection.subject} · ${day.selection.methods
+            .map(methodLabel)
+            .join(' · ')}`}
+          className="absolute inset-x-1 bottom-1 flex cursor-grab items-center gap-1 rounded-md px-1.5 py-1 active:cursor-grabbing"
+          style={{ backgroundColor: `${sub?.color ?? '#888888'}20` }}
         >
-          {day.meetingInfo.length}
-        </motion.div>
+          <span
+            className="h-1.5 w-1.5 shrink-0 rounded-full"
+            style={{ backgroundColor: sub?.color ?? '#888888' }}
+          />
+          <span className="min-w-0 flex-1 truncate text-[10px] font-semibold leading-none text-primary">
+            {sub?.label ?? day.selection.subject}
+          </span>
+          {day.selection.methods.length > 1 && (
+            <span
+              className="shrink-0 rounded px-1 text-[9px] font-bold leading-none text-primary"
+              style={{ backgroundColor: 'rgb(var(--color-fg) / 0.15)' }}
+            >
+              ×{day.selection.methods.length}
+            </span>
+          )}
+        </div>
+      )}
+
+      {!isPadding && dragActive && !day.selection && (
+        <span className="pointer-events-none absolute bottom-1 right-2 text-base font-light text-primary/40">
+          +
+        </span>
       )}
     </motion.div>
   );
 };
 
-  interface CalendarGridProps {
-  onHover: (day: string | null) => void;
-  onClick: (day: string) => void;
+interface CalendarGridProps {
   days: DayType[];
+  dragActive: boolean;
+  onOpen: (day: string) => void;
+  onDropNew: (day: string) => void;
+  onMove: (from: string, to: string) => void;
 }
 
-const CalendarGrid: React.FC<CalendarGridProps> = ({ onHover, onClick, days }) => {
-  return (
-    <div className="h-full grid grid-cols-7 grid-rows-7 auto-rows-fr gap-1.5 md:gap-2 lg:gap-3">
-      {days.map((day, index) => (
-        <Day
-          key={`${day.day}-${index}`}
-          classNames={day.classNames}
-          day={day}
-          onHover={onHover}
-          onClick={onClick}
-        />
-      ))}
-    </div>
-  );
-};
+const CalendarGrid: React.FC<CalendarGridProps> = ({
+  days,
+  dragActive,
+  onOpen,
+  onDropNew,
+  onMove,
+}) => (
+  <div className="h-full grid grid-cols-7 grid-rows-6 auto-rows-fr gap-1.5 md:gap-2 lg:gap-3">
+    {days.map((day, index) => (
+      <Day
+        key={`${day.day}-${index}`}
+        day={day}
+        dragActive={dragActive}
+        onOpen={onOpen}
+        onDropNew={onDropNew}
+        onMove={onMove}
+      />
+    ))}
+  </div>
+);
 
 const LearningSelectionCard: React.FC<{
-  isOpen: boolean;
+  day: string;
+  monthLabel: string;
+  workKey: string;
+  initial?: Selection;
   onClose: () => void;
-  onSubmit: (subject: string, method: string) => void;
-  selectedDay: string | null;
-}> = ({ isOpen, onClose, onSubmit, selectedDay }) => {
-  if (!isOpen || !selectedDay) return null;
+  onSubmit: (subject: string, methods: string[]) => void;
+  onDelete: () => void;
+}> = ({ day, monthLabel, workKey, initial, onClose, onSubmit, onDelete }) => {
+  const [setup, setSetup] = useState(!initial);
+  const [subject, setSubject] = useState(initial?.subject ?? '');
+  const [methods, setMethods] = useState<string[]>(initial?.methods ?? []);
+  const [error, setError] = useState<string | null>(null);
 
-  const subjects = [
-    { value: 'mathématiques', label: 'Mathématiques', color: '#3b82f6' },
-    { value: 'physique', label: 'Physique', color: '#ef4444' },
-    { value: 'chimie', label: 'Chimie', color: '#10b981' },
-    { value: 'biologie', label: 'Biologie', color: '#8b5cf6' },
-    { value: 'histoire', label: 'Histoire', color: '#f59e0b' },
-    { value: 'géographie', label: 'Géographie', color: '#06b6d4' },
-    { value: 'langues', label: 'Langues', color: '#ec4899' },
-    { value: 'programmation', label: 'Programmation', color: '#6366f1' },
-    { value: 'philosophie', label: 'Philosophie', color: '#84cc16' },
-    { value: 'littérature', label: 'Littérature', color: '#f97316' },
-    { value: 'art', label: 'Art & Musique', color: '#d946ef' },
-    { value: 'sport', label: 'Éducation physique', color: '#14b8a6' }
-  ];
+  const subMeta = subjectMeta(subject);
+  // Keep method order stable (as declared in METHODS) so the stacked workspaces
+  // don't jump around when toggled.
+  const orderedMethods = METHODS.filter((m) => methods.includes(m.value)).map((m) => m.value);
 
-  const methods = [
-    { value: 'vidéos', label: 'Vidéos explicatives', icon: '🎥' },
-    { value: 'exercices', label: 'Exercices pratiques', icon: '✏️' },
-    { value: 'lecture', label: 'Lecture & notes', icon: '📖' },
-    { value: 'projets', label: 'Projets concrets', icon: '🛠️' },
-    { value: 'discussion', label: 'Étude en groupe', icon: '👥' },
-    { value: 'flashcards', label: 'Flashcards & mémorisation', icon: '🃏' },
-    { value: 'mindmap', label: 'Cartes mentales', icon: '🧠' },
-    { value: 'podcast', label: 'Podcasts & audio', icon: '🎧' },
-    { value: 'simulation', label: 'Simulations & labos', icon: '🔬' },
-    { value: 'lecture_active', label: 'Lecture active & synthèse', icon: '📝' }
-  ];
+  const toggleMethod = (value: string) => {
+    setMethods((prev) => (prev.includes(value) ? prev.filter((x) => x !== value) : [...prev, value]));
+    setError(null);
+  };
 
-  const [formSubject, setFormSubject] = useState('');
-  const [formMethod, setFormMethod] = useState('');
-
-  // Load existing selection for this day if any
-  useEffect(() => {
-    if (selectedDay) {
-      const saved = localStorage.getItem('reiim-learning-selections');
-      if (saved) {
-        try {
-          const selections = JSON.parse(saved);
-          const dayKey = `${new Date().getFullYear()}-${new Date().getMonth() + 1}-${selectedDay}`;
-          const dayData = selections[dayKey];
-          if (dayData) {
-            setFormSubject(dayData.subject || '');
-            setFormMethod(dayData.method || '');
-          }
-        } catch (e) {
-          console.warn('Failed to load learning selection:', e);
-        }
-      }
-    }
-  }, [selectedDay]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formSubject || !formMethod) {
-      alert('Veuillez sélectionner une matière et une méthode d\'apprentissage');
+  const planify = () => {
+    if (!subject) {
+      setError('Choisis une matière.');
       return;
     }
-
-    const saved = localStorage.getItem('reiim-learning-selections');
-    const selections = saved ? JSON.parse(saved) : {};
-    const dayKey = `${new Date().getFullYear()}-${new Date().getMonth() + 1}-${selectedDay}`;
-    selections[dayKey] = { subject: formSubject, method: formMethod };
-    localStorage.setItem('reiim-learning-selections', JSON.stringify(selections));
-
-    onSubmit(formSubject, formMethod);
-    onClose();
+    if (methods.length === 0) {
+      setError('Choisis au moins une méthode.');
+      return;
+    }
+    setError(null);
+    onSubmit(subject, orderedMethods);
+    setSetup(false);
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-2xl"
+      style={{ backgroundColor: 'rgb(var(--color-bg) / 0.92)' }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
       <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-lg shadow-xl w-full h-full relative"
+        initial={{ scale: 0.96, opacity: 0, y: 10 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.96, opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-lg rounded-2xl border shadow-xl"
+        style={{ backgroundColor: 'rgb(var(--color-surface))', borderColor: 'rgb(var(--color-fg) / 0.12)' }}
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-opacity"
+          aria-label="Fermer"
+          className="absolute right-3 top-2 z-[1] text-2xl leading-none text-muted transition-colors hover:text-primary"
         >
           ×
         </button>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-6 w-full h-full flex flex-col">
-          <div className="space-y-3">
-            <h3 className="text-lg font-semibold flex items-center gap-2 text-[var(--foreground)]">
-              📚 Planifier une activité
+        <div className="flex max-h-[85vh] flex-col gap-5 overflow-y-auto p-6">
+          <div>
+            <h3 className="text-lg font-semibold text-primary">
+              {setup ? 'Planifier un devoir' : 'Espace de travail'}
             </h3>
-            <p className="text-[var(--foreground-muted)] text-sm">
-              Pour le {selectedDay} {new Intl.DateTimeFormat('fr-FR', { month: 'long' }).format(new Date())}
+            <p className="text-sm capitalize text-muted">
+              {day} {monthLabel}
             </p>
           </div>
 
-          <div className="flex-1 space-y-3 overflow-y-auto">
-            <div className="space-y-2">
-              <label className="block text-[var(--foreground-muted)] font-medium text-xs mb-1">Matière</label>
-              <select
-                value={formSubject}
-                onChange={(e) => setFormSubject(e.target.value)}
-                className="w-full px-4 py-3 border border-[var(--border)]/30 bg-white/5 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-transparent text-[var(--foreground)]"
-              >
-                <option value="">-- Sélectionne une matière --</option>
-                {subjects.map(sub => (
-                  <option key={sub.value} value={sub.value}>
-                    {sub.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {setup ? (
+            <>
+              <div>
+                <p className="mb-2 text-xs font-medium text-muted">Matière</p>
+                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                  {SUBJECTS.map((s) => {
+                    const active = subject === s.value;
+                    return (
+                      <button
+                        key={s.value}
+                        type="button"
+                        onClick={() => {
+                          setSubject(s.value);
+                          setError(null);
+                        }}
+                        className="flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-left text-xs font-medium transition-colors"
+                        style={{
+                          borderColor: active ? s.color : 'rgb(var(--color-fg) / 0.12)',
+                          backgroundColor: active ? `${s.color}1f` : 'transparent',
+                          color: 'rgb(var(--color-fg))',
+                        }}
+                      >
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: s.color }}
+                        />
+                        <span className="truncate">{s.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-            <div className="space-y-2">
-              <label className="block text-[var(--foreground-muted)] font-medium text-xs mb-1">Méthode d'apprentissage</label>
-              <select
-                value={formMethod}
-                onChange={(e) => setFormMethod(e.target.value)}
-                className="w-full px-4 py-3 border border-[var(--border)]/30 bg-white/5 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-transparent text-[var(--foreground)]"
-              >
-                <option value="">-- Sélectionne une méthode --</option>
-                {methods.map((meth) => (
-                  <option key={meth.value} value={meth.value}>
-                    {meth.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+              <div>
+                <div className="mb-2 flex items-baseline justify-between gap-2">
+                  <p className="text-xs font-medium text-muted">Méthode(s) d'apprentissage</p>
+                  <p className="text-[11px] text-muted-soft">
+                    Plusieurs possibles — les espaces s'empilent
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {METHODS.map((m) => {
+                    const active = methods.includes(m.value);
+                    return (
+                      <button
+                        key={m.value}
+                        type="button"
+                        onClick={() => toggleMethod(m.value)}
+                        className="rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+                        style={{
+                          borderColor: active
+                            ? 'rgb(var(--color-fg))'
+                            : 'rgb(var(--color-fg) / 0.15)',
+                          backgroundColor: active ? 'rgb(var(--color-fg))' : 'transparent',
+                          color: active ? 'rgb(var(--color-bg))' : 'rgb(var(--color-fg) / 0.75)',
+                        }}
+                      >
+                        {m.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-          <button
-            type="submit"
-            className="mt-6 w-full bg-gradient-to-r from-[var(--primary)]/20 to-[var(--secondary)]/20 text-[var(--foreground)] font-medium py-3 px-6 rounded-lg hover:bg-gradient-to-r from-[var(--primary)]/30 to-[var(--secondary)]/30 transition-all flex items-center justify-center gap-2"
-          >
-            ✓ Enregistrer
-          </button>
-        </form>
+              {error && (
+                <p className="text-xs" style={{ color: 'rgb(239 68 68)' }}>
+                  {error}
+                </p>
+              )}
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={planify}
+                  className="flex-1 rounded-lg py-2.5 text-sm font-medium transition-opacity hover:opacity-90"
+                  style={{ backgroundColor: 'rgb(var(--color-fg))', color: 'rgb(var(--color-bg))' }}
+                >
+                  {initial ? 'Mettre à jour' : 'Planifier'}
+                </button>
+                {initial && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubject(initial.subject);
+                      setMethods(initial.methods);
+                      setError(null);
+                      setSetup(false);
+                    }}
+                    className="rounded-lg border px-4 py-2.5 text-sm font-medium text-muted transition-colors hover:text-primary"
+                    style={{ borderColor: 'rgb(var(--color-fg) / 0.15)' }}
+                  >
+                    Annuler
+                  </button>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div
+                className="flex items-start justify-between gap-3 rounded-xl p-3"
+                style={{ backgroundColor: `${subMeta?.color ?? '#888888'}14` }}
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: subMeta?.color ?? '#888888' }}
+                    />
+                    <p className="truncate text-sm font-semibold text-primary">
+                      {subMeta?.label ?? subject}
+                    </p>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {orderedMethods.map((m) => (
+                      <span
+                        key={m}
+                        className="rounded-full px-2 py-0.5 text-[10px] font-medium text-primary"
+                        style={{ backgroundColor: 'rgb(var(--color-fg) / 0.08)' }}
+                      >
+                        {METHODS.find((x) => x.value === m)?.label ?? m}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSetup(true)}
+                  className="shrink-0 text-xs font-medium text-muted transition-colors hover:text-primary"
+                >
+                  Changer
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-4">
+                {orderedMethods.map((m, i) => (
+                  <div
+                    key={m}
+                    className={i > 0 ? 'border-t pt-4' : ''}
+                    style={i > 0 ? { borderColor: 'rgb(var(--color-fg) / 0.1)' } : undefined}
+                  >
+                    {orderedMethods.length > 1 && (
+                      <p className="mb-2 text-sm font-semibold text-primary">
+                        {METHODS.find((x) => x.value === m)?.label ?? m}
+                      </p>
+                    )}
+                    <MethodWorkspace
+                      method={m}
+                      workKey={workKey}
+                      subject={subMeta?.label ?? subject}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={onDelete}
+                className="flex items-center justify-center gap-2 rounded-lg border py-2.5 text-sm font-medium transition-colors"
+                style={{ borderColor: 'rgb(239 68 68 / 0.35)', color: 'rgb(239 68 68)' }}
+              >
+                <Trash2 className="h-4 w-4" /> Supprimer ce devoir
+              </button>
+            </>
+          )}
+        </div>
       </motion.div>
-    </div>
+    </motion.div>
   );
 };
 
-const InteractiveCalendar = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->((props, ref) => {
+type CalendarProps = Omit<
+  React.HTMLAttributes<HTMLDivElement>,
+  'onAnimationStart' | 'onAnimationEnd' | 'onAnimationIteration' | 'onDrag' | 'onDragStart' | 'onDragEnd'
+>;
+
+const InteractiveCalendar = React.forwardRef<HTMLDivElement, CalendarProps>((props, ref) => {
   const { className, ...restProps } = props;
   const [moreView, setMoreView] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [showSelectionCard, setShowSelectionCard] = useState(false);
+  const [showCard, setShowCard] = useState(false);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [selections, setSelections] = useState<Selections>({});
+  const [dragActive, setDragActive] = useState(false);
 
-
-  const handleDayClick = (day: string) => {
-    setSelectedDay(day);
-    setShowSelectionCard(true);
-  };
-
-  const handleDayHover = (day: string | null) => {
-    // We could use this for hover effects if needed
-    // For now, we just need it to satisfy the Day component's onHover prop
-  };
-
-  const handleCloseCard = () => {
-    setSelectedDay(null);
-    setShowSelectionCard(false);
-  };
-
-  const handleSelectionSubmit = (subject: string, method: string) => {
-    // This is handled in the LearningSelectionCard component via localStorage
-    // We could add additional logic here if needed (e.g., update meeting info)
-    console.log(`Saved learning selection for ${selectedDay}: ${subject} - ${method}`);
-    setSelectedDay(null);
-    setShowSelectionCard(false);
-  };
-
-  // Update the date display
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentDate(new Date());
-    }, 60000); // Update every minute
+    setSelections(readSelections());
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => setCurrentDate(new Date()), 60000);
     return () => clearInterval(interval);
   }, []);
 
-  // Format date in French
-  const formattedDate = useMemo(() => {
-    return new Intl.DateTimeFormat('fr-FR', {
-      year: 'numeric',
-      month: 'long'
-    }).format(currentDate);
-  }, [currentDate]);
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
 
-  // Generate days for the current month with proper padding
-  const generateDays = (date: Date): DayType[] => {
-    const year = date.getFullYear();
-    const month = date.getMonth(); // 0-11
-
-    // First day of the month
-    const firstDay = new Date(year, month, 1);
-    // Last day of the month
-    const lastDay = new Date(year, month + 1, 0);
-
-    const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay(); // 0 (Sunday) to 6 (Saturday)
-
-    const days: DayType[] = [];
-
-    // Add padding days from previous month
-    const prevMonthLastDate = new Date(year, month, 0).getDate();
-    for (let i = startingDayOfWeek; i > 0; i--) {
-      const dayValue = prevMonthLastDate - i + 1;
-      days.push({
-        day: `-${dayValue}`,
-        classNames: 'bg-white/[0.03]'
-      });
-    }
-
-    // Add days of current month
-    for (let day = 1; day <= daysInMonth; day++) {
-      // Highlight today
-      const today = new Date();
-      const isToday =
-        day === today.getDate() &&
-        month === today.getMonth() &&
-        year === today.getFullYear();
-
-      days.push({
-        day: day.toString().padStart(2, '0'),
-        classNames: isToday
-          ? 'bg-white/[0.08] ring-2 ring-white/20'
-          : 'bg-white/[0.06]'
-      });
-    }
-
-    // Add padding days from next month to complete the grid (6 rows x 7 cols = 42 cells)
-    const totalDaysSoFar = days.length;
-    const remainingDays = 42 - totalDaysSoFar;
-
-    for (let i = 1; i <= remainingDays; i++) {
-      days.push({
-        day: `+${i}`,
-        classNames: 'bg-white/[0.03]'
-      });
-    }
-
-    return days;
+  const openDay = (day: string) => {
+    setSelectedDay(day);
+    setShowCard(true);
+  };
+  const closeCard = () => {
+    setShowCard(false);
+    setSelectedDay(null);
   };
 
-  // Generate days for the current date
-  const DAYS = useMemo(() => generateDays(currentDate), [currentDate]);
+  const saveSelection = (subject: string, methods: string[]) => {
+    if (!selectedDay) return;
+    setSelections((prev) => {
+      const next = { ...prev, [keyFor(year, month, selectedDay)]: { subject, methods } };
+      writeSelections(next);
+      return next;
+    });
+    // Card stays open on the method workspace(s).
+  };
 
-  const sortedDays = useMemo(() => {
-    return [...DAYS];
-  }, [DAYS]);
+  const deleteSelection = () => {
+    if (!selectedDay) return;
+    setSelections((prev) => {
+      const next = { ...prev };
+      delete next[keyFor(year, month, selectedDay)];
+      writeSelections(next);
+      return next;
+    });
+    closeCard();
+  };
+
+  const moveSelection = (from: string, to: string) => {
+    setSelections((prev) => {
+      const fromKey = keyFor(year, month, from);
+      const moving = prev[fromKey];
+      if (!moving) return prev;
+      const next = { ...prev };
+      delete next[fromKey];
+      next[keyFor(year, month, to)] = moving;
+      writeSelections(next);
+      return next;
+    });
+  };
+
+  const formattedDate = useMemo(
+    () => new Intl.DateTimeFormat('fr-FR', { year: 'numeric', month: 'long' }).format(currentDate),
+    [currentDate],
+  );
+  const monthLabel = useMemo(
+    () => new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(currentDate),
+    [currentDate],
+  );
+
+  const days = useMemo<DayType[]>(() => {
+    const firstDay = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const startDow = firstDay.getDay();
+    const prevMonthLast = new Date(year, month, 0).getDate();
+    const today = new Date();
+
+    const out: DayType[] = [];
+    for (let i = startDow; i > 0; i--) out.push({ day: `-${prevMonthLast - i + 1}` });
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dd = d.toString().padStart(2, '0');
+      out.push({
+        day: dd,
+        isToday:
+          d === today.getDate() && month === today.getMonth() && year === today.getFullYear(),
+        selection: selections[keyFor(year, month, dd)],
+      });
+    }
+    for (let i = 1; out.length < 42; i++) out.push({ day: `+${i}` });
+    return out;
+  }, [year, month, selections]);
+
+  const plannedCount = useMemo(
+    () => Object.keys(selections).filter((k) => k.startsWith(`${year}-${month + 1}-`)).length,
+    [selections, year, month],
+  );
+
+  const changeMonth = (delta: number) =>
+    setCurrentDate((prev) => {
+      const d = new Date(prev);
+      d.setMonth(d.getMonth() + delta);
+      return d;
+    });
+
+  const currentSelection = selectedDay
+    ? selections[keyFor(year, month, selectedDay)]
+    : undefined;
 
   return (
-    <AnimatePresence mode="wait">
       <motion.div
         ref={ref}
         className={`relative w-full h-full flex flex-col lg:flex-row items-stretch gap-4 lg:gap-8 p-3 md:p-6 lg:p-8 ${className ?? ''}`}
         {...restProps}
       >
-        <motion.div layout className="w-full lg:flex-1 lg:max-w-none min-w-0 min-h-0 flex flex-col gap-4 lg:gap-6 flex-shrink-0">
-          <motion.div
-            key="calendar-view"
-            className="flex w-full flex-col gap-4 md:gap-5 h-full"
-          >
+        <motion.div
+          layout
+          className="w-full lg:flex-1 lg:max-w-none min-w-0 min-h-0 flex flex-col gap-4 lg:gap-6 flex-shrink-0"
+        >
+          <motion.div key="calendar-view" className="flex w-full flex-col gap-3 md:gap-4 h-full">
             <div className="flex w-full items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2">
                 <motion.button
-                  onClick={() => {
-                    setCurrentDate(prev => {
-                      const newDate = new Date(prev);
-                      newDate.setMonth(newDate.getMonth() - 1);
-                      return newDate;
-                    });
-                  }}
+                  onClick={() => changeMonth(-1)}
                   className="flex items-center justify-center w-8 h-8 rounded-lg ui-chip hover:ui-soft-fill-strong transition-colors"
                   aria-label="Mois précédent"
                 >
@@ -398,13 +670,7 @@ const InteractiveCalendar = React.forwardRef<
                   ></div>
                 </motion.button>
                 <motion.button
-                  onClick={() => {
-                    setCurrentDate(prev => {
-                      const newDate = new Date(prev);
-                      newDate.setMonth(newDate.getMonth() + 1);
-                      return newDate;
-                    });
-                  }}
+                  onClick={() => changeMonth(1)}
                   className="flex items-center justify-center w-8 h-8 rounded-lg ui-chip hover:ui-soft-fill-strong transition-colors"
                   aria-label="Mois suivant"
                 >
@@ -414,18 +680,52 @@ const InteractiveCalendar = React.forwardRef<
                 </motion.button>
               </div>
             </div>
+
+            {/* Drag source: a "devoir" you drop onto a day */}
+            <div className="flex flex-shrink-0 items-center gap-3">
+              <div
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(DND_MIME, DND_NEW);
+                  e.dataTransfer.effectAllowed = 'copy';
+                  setDragActive(true);
+                }}
+                onDragEnd={() => setDragActive(false)}
+                className="flex cursor-grab select-none items-center gap-2 rounded-xl ui-chip border px-3 py-2 active:cursor-grabbing"
+              >
+                <GripVertical className="h-4 w-4 text-muted" />
+                <span className="text-sm font-medium text-primary">Nouveau devoir</span>
+              </div>
+              <p className="hidden text-xs text-muted sm:block">
+                {dragActive
+                  ? 'Dépose-le sur un jour…'
+                  : 'Glisse-le sur un jour, puis choisis la matière et la méthode'}
+              </p>
+              {plannedCount > 0 && (
+                <span className="ml-auto whitespace-nowrap text-xs text-muted">
+                  {plannedCount} planifié{plannedCount > 1 ? 's' : ''} ce mois
+                </span>
+              )}
+            </div>
+
             <div className="grid grid-cols-7 gap-1.5 md:gap-2 lg:gap-3 flex-shrink-0">
-              {daysOfWeek.map((day) => (
+              {daysOfWeek.map((d) => (
                 <div
-                  key={day}
+                  key={d}
                   className="rounded-xl ui-soft-fill-strong py-1.5 md:py-2 text-center text-[11px] md:text-sm font-semibold tracking-wider text-primary select-none"
                 >
-                  {day}
+                  {d}
                 </div>
               ))}
             </div>
             <div className="flex-1 min-h-0 min-w-0 flex-shrink">
-              <CalendarGrid onHover={handleDayHover} onClick={handleDayClick} days={sortedDays} />
+              <CalendarGrid
+                days={days}
+                dragActive={dragActive}
+                onOpen={openDay}
+                onDropNew={openDay}
+                onMove={moveSelection}
+              />
             </div>
           </motion.div>
         </motion.div>
@@ -438,51 +738,78 @@ const InteractiveCalendar = React.forwardRef<
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.3 }}
           >
-            <motion.div
-              key="more-view"
-              className="mt-0 md:mt-4 flex w-full flex-col gap-4 h-full"
-            >
+            <motion.div key="more-view" className="mt-0 md:mt-4 flex w-full flex-col gap-4 h-full">
               <div className="flex w-full flex-col items-start justify-between gap-1 flex-shrink-0">
                 <motion.h2 className="mb-0 md:mb-1 text-2xl md:text-4xl lg:text-5xl font-bold tracking-wider text-primary select-none">
                   Liste
                 </motion.h2>
                 <p className="font-medium text-muted text-xs md:text-sm">
-                  Aucun élément à afficher
+                  {plannedCount === 0
+                    ? 'Aucun devoir planifié ce mois'
+                    : `${plannedCount} devoir${plannedCount > 1 ? 's' : ''} ce mois`}
                 </p>
               </div>
               <motion.div
-                className="flex-1 min-h-0 flex flex-col items-start justify-start overflow-hidden rounded-xl ui-border border ui-card"
+                className="flex-1 min-h-0 overflow-y-auto rounded-xl ui-border border ui-card"
                 layout
               >
-                <AnimatePresence>
-                  <motion.div
-                    className="w-full h-full flex items-center justify-center"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                  >
+                {plannedCount === 0 ? (
+                  <div className="flex h-full w-full items-center justify-center">
                     <div className="flex flex-col items-center gap-2 px-6 text-center">
                       <div className="h-10 w-10 rounded-full ui-border border ui-soft-fill" />
-                      <p className="text-sm md:text-base text-muted">
-                        Aucune donnée
-                      </p>
+                      <p className="text-sm md:text-base text-muted">Aucune donnée</p>
                     </div>
-                  </motion.div>
-                </AnimatePresence>
+                  </div>
+                ) : (
+                  <ul className="flex flex-col divide-y" style={{ borderColor: 'rgb(var(--color-fg) / 0.08)' }}>
+                    {days
+                      .filter((d) => d.selection)
+                      .map((d) => {
+                        const s = subjectMeta(d.selection!.subject);
+                        return (
+                          <li key={d.day}>
+                            <button
+                              onClick={() => openDay(d.day)}
+                              className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:ui-soft-fill"
+                            >
+                              <span
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold text-primary"
+                                style={{ backgroundColor: `${s?.color ?? '#888888'}22` }}
+                              >
+                                {d.day}
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-medium text-primary">
+                                  {s?.label ?? d.selection!.subject}
+                                </span>
+                                <span className="block truncate text-xs text-muted">
+                                  {d.selection!.methods.map(methodLabel).join(' · ')}
+                                </span>
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                  </ul>
+                )}
               </motion.div>
             </motion.div>
           </motion.div>
         )}
 
-        {/* Learning Selection Card */}
-        <LearningSelectionCard
-          isOpen={showSelectionCard}
-          onClose={handleCloseCard}
-          onSubmit={handleSelectionSubmit}
-          selectedDay={selectedDay}
-        />
+        {showCard && selectedDay && (
+          <LearningSelectionCard
+            key={selectedDay}
+            day={selectedDay}
+            monthLabel={monthLabel}
+            workKey={keyFor(year, month, selectedDay)}
+            initial={currentSelection}
+            onClose={closeCard}
+            onSubmit={saveSelection}
+            onDelete={deleteSelection}
+          />
+        )}
       </motion.div>
-    </AnimatePresence>
   );
 });
 InteractiveCalendar.displayName = 'InteractiveCalendar';

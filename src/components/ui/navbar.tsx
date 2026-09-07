@@ -1,13 +1,24 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CalendarDays, LayoutDashboard, Menu, X, Sun, Moon } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, Menu, X, Sun, Moon, User } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
+import { useAuth } from '@/lib/auth';
+
+export type Page = 'dashboard' | 'calendar' | 'profile';
 
 interface NavbarProps {
-  active?: 'dashboard' | 'calendar';
-  onNavigate?: (page: 'dashboard' | 'calendar') => void;
+  active?: Page;
+  onNavigate?: (page: Page) => void;
   className?: string;
 }
+
+const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? '')
+    .join('') || '?';
 
 const Navbar: React.FC<NavbarProps> = ({
   active = 'calendar',
@@ -16,10 +27,15 @@ const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const { user } = useAuth();
 
-  const items: { key: 'dashboard' | 'calendar'; label: string; Icon: typeof CalendarDays }[] = [
+  const items: { key: Page; label: string; Icon: typeof CalendarDays }[] = [
     { key: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
     { key: 'calendar', label: 'Calendrier', Icon: CalendarDays },
+  ];
+  const mobileItems: { key: Page; label: string; Icon: typeof CalendarDays }[] = [
+    ...items,
+    { key: 'profile', label: 'Profil', Icon: User },
   ];
 
   return (
@@ -68,6 +84,29 @@ const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         <div className="flex items-center justify-end gap-2">
+          <motion.button
+            onClick={() => onNavigate?.('profile')}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            aria-label="Profil"
+            className="hidden md:flex h-9 w-9 items-center justify-center overflow-hidden rounded-full text-xs font-semibold transition-shadow"
+            style={{
+              backgroundColor:
+                active === 'profile' ? 'rgb(var(--color-fg))' : 'rgb(var(--color-fg) / 0.08)',
+              color: active === 'profile' ? 'rgb(var(--color-bg))' : 'rgb(var(--color-fg))',
+              boxShadow:
+                active === 'profile' ? '0 0 0 2px rgb(var(--color-fg) / 0.25)' : 'none',
+            }}
+          >
+            {user?.avatar ? (
+              <img src={user.avatar} alt="" className="h-full w-full object-cover" />
+            ) : user ? (
+              initials(user.name)
+            ) : (
+              <User className="h-4 w-4" />
+            )}
+          </motion.button>
+
           <motion.button
             onClick={toggleTheme}
             whileHover={{ scale: 1.05 }}
@@ -132,7 +171,7 @@ const Navbar: React.FC<NavbarProps> = ({
             exit={{ opacity: 0, y: -8, height: 0 }}
             className="md:hidden flex flex-col gap-1 px-4 pb-3"
           >
-            {items.map(({ key, label, Icon }) => {
+            {mobileItems.map(({ key, label, Icon }) => {
               const isActive = active === key;
               return (
                 <li key={key}>

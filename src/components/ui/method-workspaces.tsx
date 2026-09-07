@@ -1,0 +1,592 @@
+import React, { useState } from 'react';
+import { Check, Plus, Sparkles, X } from 'lucide-react';
+import { useWork } from '@/lib/devoir-work';
+import { useAuth } from '@/lib/auth';
+import { askAI, AIError } from '@/lib/ai';
+import { Loader } from '@/components/ui/loader';
+
+const uid = () => Math.random().toString(36).slice(2, 9);
+
+const inputCls =
+  'w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/25';
+const inputStyle: React.CSSProperties = {
+  backgroundColor: 'rgb(var(--color-surface))',
+  color: 'rgb(var(--color-fg))',
+  borderColor: 'rgb(var(--color-fg) / 0.15)',
+};
+
+const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">{children}</p>
+);
+
+const CheckBox: React.FC<{ on: boolean; onClick: () => void }> = ({ on, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-label={on ? 'Décocher' : 'Cocher'}
+    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors"
+    style={{
+      borderColor: 'rgb(var(--color-fg) / 0.3)',
+      backgroundColor: on ? 'rgb(var(--color-fg))' : 'transparent',
+      color: 'rgb(var(--color-bg))',
+    }}
+  >
+    {on && <Check className="h-3 w-3" />}
+  </button>
+);
+
+const IconBtn: React.FC<{ label: string; onClick: () => void; children: React.ReactNode }> = ({
+  label,
+  onClick,
+  children,
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-label={label}
+    className="shrink-0 text-muted transition-colors hover:text-primary"
+  >
+    {children}
+  </button>
+);
+
+const AddField: React.FC<{ placeholder: string; onAdd: (v: string) => void }> = ({
+  placeholder,
+  onAdd,
+}) => {
+  const [v, setV] = useState('');
+  return (
+    <input
+      value={v}
+      onChange={(e) => setV(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const t = v.trim();
+          if (t) {
+            onAdd(t);
+            setV('');
+          }
+        }
+      }}
+      placeholder={placeholder}
+      className={inputCls}
+      style={inputStyle}
+    />
+  );
+};
+
+type Task = { id: string; text: string; done: boolean };
+
+const TaskList: React.FC<{
+  items: Task[];
+  placeholder: string;
+  onChange: (items: Task[]) => void;
+}> = ({ items, placeholder, onChange }) => {
+  const done = items.filter((i) => i.done).length;
+  return (
+    <div className="flex flex-col gap-2">
+      {items.length > 0 && (
+        <div
+          className="h-1 w-full overflow-hidden rounded-full"
+          style={{ backgroundColor: 'rgb(var(--color-fg) / 0.1)' }}
+        >
+          <div
+            className="h-full rounded-full transition-all"
+            style={{
+              width: `${(done / items.length) * 100}%`,
+              backgroundColor: 'rgb(var(--color-fg))',
+            }}
+          />
+        </div>
+      )}
+      {items.map((it) => (
+        <div key={it.id} className="flex items-center gap-2">
+          <CheckBox
+            on={it.done}
+            onClick={() =>
+              onChange(items.map((x) => (x.id === it.id ? { ...x, done: !x.done } : x)))
+            }
+          />
+          <input
+            value={it.text}
+            onChange={(e) =>
+              onChange(items.map((x) => (x.id === it.id ? { ...x, text: e.target.value } : x)))
+            }
+            className={`flex-1 bg-transparent text-sm outline-none ${
+              it.done ? 'text-muted line-through' : 'text-primary'
+            }`}
+          />
+          <IconBtn label="Supprimer" onClick={() => onChange(items.filter((x) => x.id !== it.id))}>
+            <X className="h-3.5 w-3.5" />
+          </IconBtn>
+        </div>
+      ))}
+      <AddField
+        placeholder={placeholder}
+        onAdd={(t) => onChange([...items, { id: uid(), text: t, done: false }])}
+      />
+    </div>
+  );
+};
+
+const TextList: React.FC<{
+  items: string[];
+  placeholder: string;
+  onChange: (items: string[]) => void;
+}> = ({ items, placeholder, onChange }) => (
+  <div className="flex flex-col gap-2">
+    {items.map((t, i) => (
+      <div key={i} className="flex items-center gap-2">
+        <span className="text-muted">•</span>
+        <input
+          value={t}
+          onChange={(e) => onChange(items.map((x, j) => (j === i ? e.target.value : x)))}
+          className="flex-1 bg-transparent text-sm text-primary outline-none"
+        />
+        <IconBtn label="Supprimer" onClick={() => onChange(items.filter((_, j) => j !== i))}>
+          <X className="h-3.5 w-3.5" />
+        </IconBtn>
+      </div>
+    ))}
+    <AddField placeholder={placeholder} onAdd={(t) => onChange([...items, t])} />
+  </div>
+);
+
+const TagInput: React.FC<{
+  tags: string[];
+  placeholder: string;
+  onChange: (tags: string[]) => void;
+}> = ({ tags, placeholder, onChange }) => (
+  <div
+    className="flex flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1.5"
+    style={{ borderColor: 'rgb(var(--color-fg) / 0.15)' }}
+  >
+    {tags.map((t, i) => (
+      <span
+        key={i}
+        className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-primary"
+        style={{ backgroundColor: 'rgb(var(--color-fg) / 0.08)' }}
+      >
+        {t}
+        <IconBtn label="Retirer" onClick={() => onChange(tags.filter((_, j) => j !== i))}>
+          <X className="h-3 w-3" />
+        </IconBtn>
+      </span>
+    ))}
+    <input
+      onKeyDown={(e) => {
+        const el = e.currentTarget;
+        if (e.key === 'Enter' && el.value.trim()) {
+          e.preventDefault();
+          onChange([...tags, el.value.trim()]);
+          el.value = '';
+        }
+      }}
+      placeholder={placeholder}
+      className="min-w-[7rem] flex-1 bg-transparent text-sm text-primary outline-none"
+    />
+  </div>
+);
+
+/* ---------- Projets concrets ---------- */
+
+type ProjectWork = { steps: Task[] };
+
+const ProjectWorkspace: React.FC<{ workKey: string }> = ({ workKey }) => {
+  const [data, set] = useWork<ProjectWork>(workKey, 'projets', { steps: [] });
+  return (
+    <div>
+      <SectionLabel>Étapes du projet</SectionLabel>
+      <TaskList
+        items={data.steps}
+        placeholder="Nouvelle étape, puis Entrée"
+        onChange={(steps) => set({ steps })}
+      />
+    </div>
+  );
+};
+
+/* ---------- Étude en groupe ---------- */
+
+type GroupWork = { when: string; place: string; members: string[]; topics: Task[] };
+
+const GroupWorkspace: React.FC<{ workKey: string }> = ({ workKey }) => {
+  const [d, set] = useWork<GroupWork>(workKey, 'discussion', {
+    when: '',
+    place: '',
+    members: [],
+    topics: [],
+  });
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <SectionLabel>Quand</SectionLabel>
+          <input
+            value={d.when}
+            onChange={(e) => set((p) => ({ ...p, when: e.target.value }))}
+            placeholder="Jeudi 18 h"
+            className={inputCls}
+            style={inputStyle}
+          />
+        </div>
+        <div>
+          <SectionLabel>Où</SectionLabel>
+          <input
+            value={d.place}
+            onChange={(e) => set((p) => ({ ...p, place: e.target.value }))}
+            placeholder="Bibliothèque"
+            className={inputCls}
+            style={inputStyle}
+          />
+        </div>
+      </div>
+      <div>
+        <SectionLabel>Participants</SectionLabel>
+        <TagInput
+          tags={d.members}
+          placeholder="Ajouter un nom, puis Entrée"
+          onChange={(members) => set((p) => ({ ...p, members }))}
+        />
+      </div>
+      <div>
+        <SectionLabel>À aborder ensemble</SectionLabel>
+        <TaskList
+          items={d.topics}
+          placeholder="Point à traiter, puis Entrée"
+          onChange={(topics) => set((p) => ({ ...p, topics }))}
+        />
+      </div>
+    </div>
+  );
+};
+
+/* ---------- Cartes mentales ---------- */
+
+type MindNode = { id: string; text: string; children: MindNode[] };
+type MindWork = { root: MindNode };
+
+const updateNode = (n: MindNode, id: string, fn: (x: MindNode) => MindNode): MindNode =>
+  n.id === id ? fn(n) : { ...n, children: n.children.map((c) => updateNode(c, id, fn)) };
+
+const dropNode = (n: MindNode, id: string): MindNode => ({
+  ...n,
+  children: n.children.filter((c) => c.id !== id).map((c) => dropNode(c, id)),
+});
+
+const Branch: React.FC<{
+  node: MindNode;
+  depth: number;
+  onChange: (id: string, fn: (n: MindNode) => MindNode) => void;
+  onDelete: (id: string) => void;
+}> = ({ node, depth, onChange, onDelete }) => (
+  <div className="flex flex-col gap-1.5" style={{ marginLeft: depth === 0 ? 0 : 16 }}>
+    <div className="flex items-center gap-1.5">
+      <span
+        className="h-1.5 w-1.5 shrink-0 rounded-full"
+        style={{ backgroundColor: `rgb(var(--color-fg) / ${depth === 0 ? 0.8 : 0.35})` }}
+      />
+      <input
+        value={node.text}
+        onChange={(e) => onChange(node.id, (n) => ({ ...n, text: e.target.value }))}
+        placeholder={depth === 0 ? 'Idée centrale' : 'Branche'}
+        className={`flex-1 bg-transparent outline-none ${
+          depth === 0 ? 'text-sm font-semibold text-primary' : 'text-sm text-primary'
+        }`}
+      />
+      {depth < 4 && (
+        <IconBtn
+          label="Ajouter une branche"
+          onClick={() =>
+            onChange(node.id, (n) => ({
+              ...n,
+              children: [...n.children, { id: uid(), text: '', children: [] }],
+            }))
+          }
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </IconBtn>
+      )}
+      {depth > 0 && (
+        <IconBtn label="Supprimer" onClick={() => onDelete(node.id)}>
+          <X className="h-3.5 w-3.5" />
+        </IconBtn>
+      )}
+    </div>
+    {node.children.map((c) => (
+      <Branch key={c.id} node={c} depth={depth + 1} onChange={onChange} onDelete={onDelete} />
+    ))}
+  </div>
+);
+
+const MindMapWorkspace: React.FC<{ workKey: string; subject: string }> = ({ workKey, subject }) => {
+  const [d, set] = useWork<MindWork>(workKey, 'mindmap', {
+    root: { id: 'root', text: subject || 'Idée centrale', children: [] },
+  });
+  return (
+    <div>
+      <SectionLabel>Carte mentale</SectionLabel>
+      <Branch
+        node={d.root}
+        depth={0}
+        onChange={(id, fn) => set((p) => ({ root: updateNode(p.root, id, fn) }))}
+        onDelete={(id) => set((p) => ({ root: dropNode(p.root, id) }))}
+      />
+    </div>
+  );
+};
+
+/* ---------- Podcasts & audio ---------- */
+
+type AudioItem = { id: string; title: string; url: string; done: boolean; note: string };
+type AudioWork = { items: AudioItem[] };
+
+const AudioWorkspace: React.FC<{ workKey: string }> = ({ workKey }) => {
+  const [d, set] = useWork<AudioWork>(workKey, 'podcast', { items: [] });
+  const patch = (id: string, p: Partial<AudioItem>) =>
+    set((prev) => ({ items: prev.items.map((x) => (x.id === id ? { ...x, ...p } : x)) }));
+  return (
+    <div className="flex flex-col gap-3">
+      <SectionLabel>Ressources audio</SectionLabel>
+      {d.items.map((it) => (
+        <div
+          key={it.id}
+          className="rounded-lg border p-2.5"
+          style={{ borderColor: 'rgb(var(--color-fg) / 0.12)' }}
+        >
+          <div className="flex items-center gap-2">
+            <CheckBox on={it.done} onClick={() => patch(it.id, { done: !it.done })} />
+            <input
+              value={it.title}
+              onChange={(e) => patch(it.id, { title: e.target.value })}
+              placeholder="Titre de l'épisode"
+              className="flex-1 bg-transparent text-sm font-medium text-primary outline-none"
+            />
+            <IconBtn
+              label="Supprimer"
+              onClick={() => set((prev) => ({ items: prev.items.filter((x) => x.id !== it.id) }))}
+            >
+              <X className="h-3.5 w-3.5" />
+            </IconBtn>
+          </div>
+          <input
+            value={it.url}
+            onChange={(e) => patch(it.id, { url: e.target.value })}
+            placeholder="Lien (https://…)"
+            className="mt-1.5 w-full bg-transparent text-xs text-muted outline-none"
+          />
+          {it.url && (
+            <a
+              href={it.url}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 inline-block text-xs underline"
+              style={{ color: 'rgb(var(--color-fg) / 0.7)' }}
+            >
+              Ouvrir
+            </a>
+          )}
+          <input
+            value={it.note}
+            onChange={(e) => patch(it.id, { note: e.target.value })}
+            placeholder="Note / minutage"
+            className="mt-1.5 w-full bg-transparent text-xs text-primary outline-none"
+          />
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() =>
+          set((prev) => ({
+            items: [...prev.items, { id: uid(), title: '', url: '', done: false, note: '' }],
+          }))
+        }
+        className="rounded-lg border border-dashed py-2 text-xs font-medium text-muted transition-colors hover:text-primary"
+        style={{ borderColor: 'rgb(var(--color-fg) / 0.2)' }}
+      >
+        + Ajouter une ressource
+      </button>
+    </div>
+  );
+};
+
+/* ---------- Lecture active & synthèse ---------- */
+
+type SynthWork = { ideas: string[]; questions: string[]; summary: string };
+
+const SynthesisWorkspace: React.FC<{ workKey: string }> = ({ workKey }) => {
+  const [d, set] = useWork<SynthWork>(workKey, 'lecture_active', {
+    ideas: [],
+    questions: [],
+    summary: '',
+  });
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <SectionLabel>Idées clés</SectionLabel>
+        <TextList
+          items={d.ideas}
+          placeholder="Une idée, puis Entrée"
+          onChange={(ideas) => set((p) => ({ ...p, ideas }))}
+        />
+      </div>
+      <div>
+        <SectionLabel>Questions à creuser</SectionLabel>
+        <TextList
+          items={d.questions}
+          placeholder="Une question, puis Entrée"
+          onChange={(questions) => set((p) => ({ ...p, questions }))}
+        />
+      </div>
+      <div>
+        <SectionLabel>Ma synthèse</SectionLabel>
+        <textarea
+          value={d.summary}
+          onChange={(e) => set((p) => ({ ...p, summary: e.target.value }))}
+          rows={4}
+          placeholder="Reformule le cours avec tes propres mots…"
+          className={`${inputCls} resize-none`}
+          style={inputStyle}
+        />
+      </div>
+    </div>
+  );
+};
+
+/* ---------- Exercices pratiques : faire l'exercice avec l'assistant ---------- */
+
+type ExerciseWork = { brief: string; answer: string };
+
+const ExerciseWorkspace: React.FC<{ workKey: string; subject: string }> = ({
+  workKey,
+  subject,
+}) => {
+  const { user, refreshProfile } = useAuth();
+  const [d, set] = useWork<ExerciseWork>(workKey, 'exercices', { brief: '', answer: '' });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const run = async () => {
+    if (busy || !d.brief.trim()) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const { answer } = await askAI({ feature: 'exercices', subject, prompt: d.brief });
+      set((p) => ({ ...p, answer }));
+      void refreshProfile();
+    } catch (e) {
+      setErr(e instanceof AIError ? e.message : 'Une erreur est survenue.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const noCredits = !!user && user.credits <= 0;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <SectionLabel>Faire l'exercice avec l'assistant</SectionLabel>
+      <textarea
+        value={d.brief}
+        onChange={(e) => set((p) => ({ ...p, brief: e.target.value }))}
+        rows={4}
+        placeholder="Colle l'énoncé de l'exercice ou du devoir…"
+        className={`${inputCls} resize-none`}
+        style={inputStyle}
+      />
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={run}
+          disabled={busy || !d.brief.trim() || noCredits}
+          className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
+          style={{ backgroundColor: 'rgb(var(--color-fg))', color: 'rgb(var(--color-bg))' }}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          {busy ? 'Résolution…' : "M'aider à le faire"}
+        </button>
+        {busy && <Loader variant="dots" size={18} />}
+        {user && (
+          <span className="ml-auto text-xs text-muted">
+            {user.credits} crédit{user.credits > 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+
+      {noCredits && !err && (
+        <p className="text-xs text-muted">
+          Tu n'as plus de crédits — passe à une offre pour continuer.
+        </p>
+      )}
+      {err && (
+        <p className="text-xs" style={{ color: 'rgb(239 68 68)' }}>
+          {err}
+        </p>
+      )}
+
+      {d.answer && (
+        <div
+          className="whitespace-pre-wrap rounded-lg border p-3 text-sm leading-relaxed text-primary"
+          style={{
+            borderColor: 'rgb(var(--color-fg) / 0.12)',
+            backgroundColor: 'rgb(var(--color-fg) / 0.03)',
+          }}
+        >
+          {d.answer}
+        </div>
+      )}
+
+      <p className="text-[11px] text-muted-soft">
+        L'assistant détaille la démarche pour que tu comprennes et rédiges toi-même.
+      </p>
+    </div>
+  );
+};
+
+/* ---------- Révision (méthodes sans espace de travail) ---------- */
+
+const METHOD_HINTS: Record<string, string> = {
+  vidéos: 'Regarde des vidéos explicatives sur le sujet le jour prévu.',
+  lecture: 'Lis le cours et prends des notes le jour prévu.',
+  flashcards: 'Révise avec des flashcards / répétition espacée le jour prévu.',
+  simulation: 'Fais la simulation ou le TP en laboratoire le jour prévu.',
+};
+
+const StudyReminder: React.FC<{ method: string }> = ({ method }) => (
+  <div
+    className="rounded-lg border border-dashed p-4 text-sm"
+    style={{ borderColor: 'rgb(var(--color-fg) / 0.15)' }}
+  >
+    <p className="font-medium text-primary">Méthode de révision</p>
+    <p className="mt-1 text-muted">
+      {METHOD_HINTS[method] ?? 'Révise le jour prévu.'} Pas d'espace de travail à préparer ici — le
+      jour J, coche le devoir quand c'est fait.
+    </p>
+  </div>
+);
+
+/* ---------- Dispatcher ---------- */
+
+export const MethodWorkspace: React.FC<{
+  method: string;
+  workKey: string;
+  subject: string;
+}> = ({ method, workKey, subject }) => {
+  switch (method) {
+    case 'exercices':
+      return <ExerciseWorkspace workKey={workKey} subject={subject} />;
+    case 'projets':
+      return <ProjectWorkspace workKey={workKey} />;
+    case 'discussion':
+      return <GroupWorkspace workKey={workKey} />;
+    case 'mindmap':
+      return <MindMapWorkspace workKey={workKey} subject={subject} />;
+    case 'podcast':
+      return <AudioWorkspace workKey={workKey} />;
+    case 'lecture_active':
+      return <SynthesisWorkspace workKey={workKey} />;
+    default:
+      return <StudyReminder method={method} />;
+  }
+};
