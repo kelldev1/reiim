@@ -1,0 +1,6 @@
+# Minimal Supabase project config. If your CLI complains, delete this file and
+# run `supabase init` to regenerate a full one (keep the [functions.ai] block).
+project_id = "reiim"
+
+[functions.ai]
+verify_jwt = true
