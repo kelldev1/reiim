@@ -5,41 +5,41 @@
 @layer base {
   :root {
     /* base palette (kept for compatibility) */
-    --color-bg: 255 247 243;
-    --color-fg: 62 38 30;
+    --color-bg: 255 255 255;
+    --color-fg: 23 23 23;
     --color-surface: 255 255 255;
     --color-surface-muted: 255 255 255;
     --color-border: 255 255 255;
     --color-border-strong: 255 255 255;
     --color-card: 255 255 255;
     --color-card-border: 255 255 255;
-    --color-muted: 148 118 102;
-    --color-muted-soft: 174 148 134;
-    --color-accent1: 255 177 163;
-    --color-accent2: 255 139 133;
-    --color-accent3: 92 184 132;
-    --color-accent4: 154 216 167;
-    --color-primary: 196 96 82;
-    --color-secondary: 84 168 118;
+    --color-muted: 115 115 115;
+    --color-muted-soft: 163 163 163;
+    --color-accent1: 212 212 212;
+    --color-accent2: 163 163 163;
+    --color-accent3: 115 115 115;
+    --color-accent4: 82 82 82;
+    --color-primary: 23 23 23;
+    --color-secondary: 82 82 82;
 
     /* tailwind semantic tokens */
-    --background: 24 100% 98%;
-    --foreground: 20 30% 16%;
-    --card: 24 100% 98%;
-    --card-foreground: 20 30% 16%;
-    --primary: 20 30% 16%;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+    --primary: 0 0% 9%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 20 14% 90%;
-    --secondary-foreground: 20 30% 16%;
-    --muted: 20 14% 90%;
-    --muted-foreground: 20 8% 45%;
-    --accent: 20 14% 90%;
-    --accent-foreground: 20 30% 16%;
+    --secondary: 0 0% 94%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 0 0% 94%;
+    --accent-foreground: 0 0% 9%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 20 14% 86%;
-    --input: 20 14% 86%;
-    --ring: 20 30% 16%;
+    --border: 0 0% 88%;
+    --input: 0 0% 88%;
+    --ring: 0 0% 9%;
     --radius: 0.75rem;
   }
 
@@ -87,12 +87,12 @@
     border-color: rgba(255, 255, 255, 0.08);
   }
   .light * {
-    border-color: rgba(60, 30, 20, 0.12);
+    border-color: rgba(0, 0, 0, 0.12);
   }
   html,
   body {
-    background-color: hsl(var(--color-bg));
-    color: hsl(var(--color-fg));
+    background-color: rgb(var(--color-bg));
+    color: rgb(var(--color-fg));
     color-scheme: dark light;
   }
 }
@@ -105,8 +105,8 @@
     -webkit-backdrop-filter: blur(18px);
   }
   .light .ui-card {
-    background-color: rgba(255, 255, 255, 0.3);
-    border: 1px solid rgba(120, 60, 40, 0.12);
+    background-color: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(0, 0, 0, 0.1);
   }
 
   .ui-chip {
@@ -115,9 +115,9 @@
     color: rgba(255, 255, 255, 0.72);
   }
   .light .ui-chip {
-    background-color: rgba(255, 255, 255, 0.45);
-    border: 1px solid rgba(120, 60, 40, 0.12);
-    color: rgba(62, 38, 30, 0.72);
+    background-color: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    color: rgba(23, 23, 23, 0.72);
   }
 
   .ui-soft-fill {
@@ -138,14 +138,14 @@
     border-color: rgba(255, 255, 255, 0.08);
   }
   .light .ui-border {
-    border-color: rgba(120, 60, 40, 0.12);
+    border-color: rgba(0, 0, 0, 0.1);
   }
 
   .ui-border-strong {
     border-color: rgba(255, 255, 255, 0.12);
   }
   .light .ui-border-strong {
-    border-color: rgba(120, 60, 40, 0.2);
+    border-color: rgba(0, 0, 0, 0.18);
   }
 }
 
@@ -154,27 +154,27 @@
     color: rgba(255, 255, 255, 0.82);
   }
   .light .text-primary {
-    color: rgba(42, 24, 18, 0.82);
+    color: rgba(23, 23, 23, 0.9);
   }
 
   .text-muted {
     color: rgba(255, 255, 255, 0.5);
   }
   .light .text-muted {
-    color: rgba(62, 38, 30, 0.55);
+    color: rgba(23, 23, 23, 0.55);
   }
 
   .text-muted-soft {
     color: rgba(255, 255, 255, 0.36);
   }
   .light .text-muted-soft {
-    color: rgba(62, 38, 30, 0.42);
+    color: rgba(23, 23, 23, 0.42);
   }
 
   .hover\:text-primary:hover {
     color: rgba(255, 255, 255, 0.82);
   }
   .light .hover\:text-primary:hover {
-    color: rgba(42, 24, 18, 0.82);
+    color: rgba(23, 23, 23, 0.9);
   }
 }

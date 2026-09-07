@@ -110,12 +110,12 @@ const THEME_PRESETS = {
     scale: 2.0,
     distortion: 0.7,
     speed: 0.28,
-    intensity: 1.2,
+    intensity: 0.85,
     detail: 5,
-    color1: '#fff7f1',
-    color2: '#ffb0a2',
-    color3: '#8dd2a7',
-    color4: '#ffd7c8',
+    color1: '#ffffff',
+    color2: '#e6e6e6',
+    color3: '#bfbfbf',
+    color4: '#d8d8d8',
   },
 };
 

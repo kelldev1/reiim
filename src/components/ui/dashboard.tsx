@@ -4,8 +4,7 @@ import type { DayType } from '@/components/ui/visualize-booking';
 import { cn } from '@/lib/utils';
 import { CalendarDays, TrendingUp, CheckCircle, Circle, ChevronRight, Info } from 'lucide-react';
 import { useBackground } from '@/lib/background';
-import { useTheme } from '@/lib/theme';
-import { BackgroundShaderStyle } from '@/lib/background-theme';
+import type { BackgroundShaderStyle } from '@/lib/background-theme';
 
 type KpiProps = {
   label: string;

@@ -16,9 +16,9 @@ function toVal(mix: ClassValue): string {
     str += mix;
   } else if (typeof mix === 'object') {
     if (Array.isArray(mix)) {
-      for (k = 0; k < mix.length; k++) {
-        if (mix[k]) {
-          if ((y = toVal(mix[k]))) {
+      for (let i = 0; i < mix.length; i++) {
+        if (mix[i]) {
+          if ((y = toVal(mix[i]))) {
             str && (str += ' ');
             str += y;
           }

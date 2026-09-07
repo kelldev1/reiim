@@ -107,7 +107,6 @@ const LearningCalendar: React.FC = () => {
     const days: JSX.Element[] = [];
 
     // Days from previous month
-    const prevLastDay = new Date(year, month, 0);
     for (let i = startingDay; i > 0; i--) {
       const day = new Date(year, month, -i + 1);
       days.push(
@@ -158,7 +157,7 @@ const LearningCalendar: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between bg-[var(--primary)] text-white p-4 rounded-lg">
         <h2 className="text-xl font-semibold">
-          {new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'style' }).format(currentDate)}
+          {new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(currentDate)}
         </h2>
         <div className="flex space-x-2">
           <button onClick={prevMonth} className="hover:opacity-80 transition-opacity">
