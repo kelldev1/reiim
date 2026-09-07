@@ -302,7 +302,9 @@ const LearningSelectionCard: React.FC<{
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-2xl"
+      className={`fixed inset-0 z-50 flex items-center justify-center backdrop-blur-2xl ${
+        bigMode ? 'p-2 sm:p-3' : 'p-4'
+      }`}
       style={{ backgroundColor: 'rgb(var(--color-bg) / 0.92)' }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -316,7 +318,7 @@ const LearningSelectionCard: React.FC<{
         transition={{ type: 'spring', stiffness: 300, damping: 26 }}
         onClick={(e) => e.stopPropagation()}
         className={`relative w-full rounded-2xl border shadow-xl ${
-          bigMode ? 'max-w-[1400px]' : 'max-w-lg'
+          bigMode ? 'max-w-none' : 'max-w-lg'
         }`}
         style={{ backgroundColor: 'rgb(var(--color-surface))', borderColor: 'rgb(var(--color-fg) / 0.12)' }}
       >
@@ -329,8 +331,8 @@ const LearningSelectionCard: React.FC<{
         </button>
 
         <div
-          className={`flex flex-col gap-5 p-6 ${
-            bigMode ? 'h-[92vh]' : 'max-h-[85vh] overflow-y-auto'
+          className={`flex flex-col ${
+            bigMode ? 'h-[94vh] gap-4 p-5' : 'max-h-[85vh] gap-5 overflow-y-auto p-6'
           }`}
         >
           <div>
