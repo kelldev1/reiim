@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, Copy, FileUp, Plus, Sparkles, X } from 'lucide-react';
+import { Check, Copy, FileText, FileUp, PenLine, Plus, Sparkles, X } from 'lucide-react';
 import { useWork } from '@/lib/devoir-work';
 import { useAuth } from '@/lib/auth';
 import { askAI, AIError } from '@/lib/ai';
@@ -23,6 +23,16 @@ const inputStyle: React.CSSProperties = {
 
 const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">{children}</p>
+);
+
+const PaneHead: React.FC<{ icon: React.ReactNode; children: React.ReactNode }> = ({
+  icon,
+  children,
+}) => (
+  <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+    {icon}
+    {children}
+  </div>
 );
 
 const CheckBox: React.FC<{ on: boolean; onClick: () => void }> = ({ on, onClick }) => (
@@ -548,11 +558,11 @@ const ExerciseWorkspace: React.FC<{ workKey: string; subject: string; fill?: boo
 
   const noCredits = !!user && user.credits <= 0;
   const canRun = !busy && !noCredits && (!!d.brief.trim() || !!pdf);
-  const box = fill ? 'min-h-0 flex-1' : '';
+  const grow = fill ? 'min-h-0 flex-1' : '';
 
   const enonce = (
-    <div className="flex min-h-0 flex-col gap-2">
-      <SectionLabel>Énoncé</SectionLabel>
+    <div className="flex min-h-0 flex-col gap-2.5">
+      <PaneHead icon={<FileText className="h-3.5 w-3.5" />}>Énoncé</PaneHead>
       <input
         ref={fileRef}
         type="file"
@@ -567,8 +577,8 @@ const ExerciseWorkspace: React.FC<{ workKey: string; subject: string; fill?: boo
           <object
             data={pdf.url}
             type="application/pdf"
-            className={`w-full rounded-lg border ${fill ? box : 'h-[300px]'}`}
-            style={{ borderColor: 'rgb(var(--color-fg) / 0.15)' }}
+            className={`w-full rounded-xl border shadow-sm ${fill ? grow : 'h-[300px]'}`}
+            style={{ borderColor: 'rgb(var(--color-fg) / 0.12)' }}
           >
             <p className="p-3 text-xs text-muted">
               Aperçu indisponible —{' '}
@@ -580,7 +590,7 @@ const ExerciseWorkspace: React.FC<{ workKey: string; subject: string; fill?: boo
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="self-start text-xs text-muted transition-colors hover:text-primary"
+            className="shrink-0 self-start text-xs text-muted transition-colors hover:text-primary"
           >
             Changer le PDF
           </button>
@@ -589,16 +599,21 @@ const ExerciseWorkspace: React.FC<{ workKey: string; subject: string; fill?: boo
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className={`flex flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed text-sm text-muted transition-colors hover:text-primary ${
-            fill ? box : 'h-[140px]'
+          className={`group flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-sm text-muted transition-colors hover:text-primary ${
+            fill ? grow : 'h-[160px]'
           }`}
-          style={{ borderColor: 'rgb(var(--color-fg) / 0.25)' }}
+          style={{ borderColor: 'rgb(var(--color-fg) / 0.2)' }}
         >
-          <FileUp className="h-5 w-5" />
-          Ajouter le PDF de l'exercice
-          {d.pdfName && (
-            <span className="text-[11px] text-muted-soft">à ré-ouvrir : {d.pdfName}</span>
-          )}
+          <span
+            className="flex h-11 w-11 items-center justify-center rounded-full transition-colors group-hover:text-primary"
+            style={{ backgroundColor: 'rgb(var(--color-fg) / 0.06)' }}
+          >
+            <FileUp className="h-5 w-5" />
+          </span>
+          <span className="font-medium">Ajouter le PDF de l'exercice</span>
+          <span className="text-[11px] text-muted-soft">
+            {d.pdfName ? `à ré-ouvrir : ${d.pdfName}` : 'ou colle l’énoncé ci-dessous'}
+          </span>
         </button>
       )}
       <textarea
@@ -615,14 +630,20 @@ const ExerciseWorkspace: React.FC<{ workKey: string; subject: string; fill?: boo
   );
 
   const corrige = (
-    <div className="flex min-h-0 flex-col gap-2">
+    <div
+      className={`flex min-h-0 flex-col gap-2.5 ${
+        fill ? 'lg:border-l lg:pl-6' : ''
+      }`}
+      style={fill ? { borderColor: 'rgb(var(--color-fg) / 0.08)' } : undefined}
+    >
       <div className="flex items-center justify-between">
-        <SectionLabel>Devoir rédigé</SectionLabel>
+        <PaneHead icon={<PenLine className="h-3.5 w-3.5" />}>Devoir rédigé</PaneHead>
         {d.answer && (
           <button
             type="button"
             onClick={copy}
-            className="flex items-center gap-1 text-xs text-muted transition-colors hover:text-primary"
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted transition-colors hover:text-primary"
+            style={{ backgroundColor: 'rgb(var(--color-fg) / 0.05)' }}
           >
             {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
             {copied ? 'Copié' : 'Copier'}
@@ -630,10 +651,12 @@ const ExerciseWorkspace: React.FC<{ workKey: string; subject: string; fill?: boo
         )}
       </div>
       <div
-        className={`overflow-y-auto rounded-lg border p-4 ${fill ? box : 'max-h-[440px] min-h-[120px]'}`}
+        className={`overflow-y-auto rounded-xl border shadow-sm ${
+          fill ? `${grow} p-6` : 'max-h-[440px] min-h-[120px] p-4'
+        }`}
         style={{
-          borderColor: 'rgb(var(--color-fg) / 0.12)',
-          backgroundColor: 'rgb(var(--color-fg) / 0.03)',
+          borderColor: 'rgb(var(--color-fg) / 0.1)',
+          backgroundColor: 'rgb(var(--color-surface))',
         }}
       >
         {d.answer ? (
@@ -641,9 +664,19 @@ const ExerciseWorkspace: React.FC<{ workKey: string; subject: string; fill?: boo
             <Markdown>{d.answer}</Markdown>
           </React.Suspense>
         ) : (
-          <p className="text-sm text-muted">
-            {busy ? 'Rédaction en cours…' : 'Le devoir rédigé apparaîtra ici.'}
-          </p>
+          <div className="flex h-full min-h-[80px] flex-col items-center justify-center gap-2 text-center">
+            {busy ? (
+              <>
+                <Loader variant="dots" size={20} />
+                <p className="text-sm text-muted">Rédaction en cours…</p>
+              </>
+            ) : (
+              <>
+                <PenLine className="h-6 w-6 text-muted-soft" />
+                <p className="text-sm text-muted">Le devoir rédigé apparaîtra ici.</p>
+              </>
+            )}
+          </div>
         )}
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-3">
@@ -651,10 +684,10 @@ const ExerciseWorkspace: React.FC<{ workKey: string; subject: string; fill?: boo
           type="button"
           onClick={run}
           disabled={!canRun}
-          className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
+          className="flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
           style={{ backgroundColor: 'rgb(var(--color-fg))', color: 'rgb(var(--color-bg))' }}
         >
-          <Sparkles className="h-3.5 w-3.5" />
+          <Sparkles className="h-4 w-4" />
           {busy ? 'Rédaction…' : d.answer ? 'Refaire' : 'Faire le devoir'}
         </button>
         {busy && <Loader variant="dots" size={18} />}
@@ -681,7 +714,9 @@ const ExerciseWorkspace: React.FC<{ workKey: string; subject: string; fill?: boo
   );
 
   return (
-    <div className={`grid gap-5 lg:grid-cols-2 ${fill ? 'min-h-0 flex-1' : ''}`}>
+    <div
+      className={`grid gap-6 ${fill ? 'min-h-0 flex-1 lg:grid-cols-[1fr_1.15fr]' : 'lg:grid-cols-2'}`}
+    >
       {enonce}
       {corrige}
     </div>

@@ -335,14 +335,52 @@ const LearningSelectionCard: React.FC<{
             bigMode ? 'h-[94vh] gap-4 p-5' : 'max-h-[85vh] gap-5 overflow-y-auto p-6'
           }`}
         >
-          <div>
-            <h3 className="text-lg font-semibold text-primary">
-              {setup ? 'Planifier un devoir' : 'Espace de travail'}
-            </h3>
-            <p className="text-sm capitalize text-muted">
-              {day} {monthLabel}
-            </p>
-          </div>
+          {bigMode ? (
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className="h-3 w-3 shrink-0 rounded-full"
+                    style={{ backgroundColor: subMeta?.color ?? '#888888' }}
+                  />
+                  <h3 className="truncate text-xl font-semibold text-primary">
+                    {subMeta?.label ?? subject}
+                  </h3>
+                </div>
+                <p className="mt-1 text-xs capitalize text-muted">
+                  Exercices pratiques · {day} {monthLabel}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5 pr-7">
+                <button
+                  type="button"
+                  onClick={() => setSetup(true)}
+                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:text-primary"
+                  style={{ backgroundColor: 'rgb(var(--color-fg) / 0.05)' }}
+                >
+                  Changer
+                </button>
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  aria-label="Supprimer ce devoir"
+                  className="rounded-lg p-2 text-muted transition-colors hover:text-primary"
+                  style={{ backgroundColor: 'rgb(var(--color-fg) / 0.05)' }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <h3 className="text-lg font-semibold text-primary">
+                {setup ? 'Planifier un devoir' : 'Espace de travail'}
+              </h3>
+              <p className="text-sm capitalize text-muted">
+                {day} {monthLabel}
+              </p>
+            </div>
+          )}
 
           {setup ? (
             <>
@@ -442,40 +480,42 @@ const LearningSelectionCard: React.FC<{
             </>
           ) : (
             <>
-              <div
-                className="flex items-start justify-between gap-3 rounded-xl p-3"
-                style={{ backgroundColor: `${subMeta?.color ?? '#888888'}14` }}
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: subMeta?.color ?? '#888888' }}
-                    />
-                    <p className="truncate text-sm font-semibold text-primary">
-                      {subMeta?.label ?? subject}
-                    </p>
-                  </div>
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {orderedMethods.map((m) => (
-                      <span
-                        key={m}
-                        className="rounded-full px-2 py-0.5 text-[10px] font-medium text-primary"
-                        style={{ backgroundColor: 'rgb(var(--color-fg) / 0.08)' }}
-                      >
-                        {METHODS.find((x) => x.value === m)?.label ?? m}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSetup(true)}
-                  className="shrink-0 text-xs font-medium text-muted transition-colors hover:text-primary"
+              {!bigMode && (
+                <div
+                  className="flex items-start justify-between gap-3 rounded-xl p-3"
+                  style={{ backgroundColor: `${subMeta?.color ?? '#888888'}14` }}
                 >
-                  Changer
-                </button>
-              </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: subMeta?.color ?? '#888888' }}
+                      />
+                      <p className="truncate text-sm font-semibold text-primary">
+                        {subMeta?.label ?? subject}
+                      </p>
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {orderedMethods.map((m) => (
+                        <span
+                          key={m}
+                          className="rounded-full px-2 py-0.5 text-[10px] font-medium text-primary"
+                          style={{ backgroundColor: 'rgb(var(--color-fg) / 0.08)' }}
+                        >
+                          {METHODS.find((x) => x.value === m)?.label ?? m}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSetup(true)}
+                    className="shrink-0 text-xs font-medium text-muted transition-colors hover:text-primary"
+                  >
+                    Changer
+                  </button>
+                </div>
+              )}
 
               <div className={`flex flex-col gap-4 ${bigMode ? 'min-h-0 flex-1' : ''}`}>
                 {orderedMethods.map((m, i) => (
@@ -501,14 +541,16 @@ const LearningSelectionCard: React.FC<{
                 ))}
               </div>
 
-              <button
-                type="button"
-                onClick={onDelete}
-                className="flex items-center justify-center gap-2 rounded-lg border py-2.5 text-sm font-medium transition-colors"
-                style={{ borderColor: 'rgb(239 68 68 / 0.35)', color: 'rgb(239 68 68)' }}
-              >
-                <Trash2 className="h-4 w-4" /> Supprimer ce devoir
-              </button>
+              {!bigMode && (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className="flex items-center justify-center gap-2 rounded-lg border py-2.5 text-sm font-medium transition-colors"
+                  style={{ borderColor: 'rgb(239 68 68 / 0.35)', color: 'rgb(239 68 68)' }}
+                >
+                  <Trash2 className="h-4 w-4" /> Supprimer ce devoir
+                </button>
+              )}
             </>
           )}
         </div>
