@@ -19,20 +19,24 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import Anthropic from 'npm:@anthropic-ai/sdk@0.124.0';
 
 const MODEL = 'claude-sonnet-5';
-// Marge pour la réflexion "adaptive" + la réponse rédigée.
-const MAX_TOKENS = 4000;
+// Marge pour la réflexion "adaptive" + un devoir rédigé en entier (dissertation...).
+const MAX_TOKENS = 6000;
 // low | medium | high | xhigh | max — compromis coût / qualité pour un devoir.
 const EFFORT = 'medium';
 const RATE_WINDOW_MS = 5000;
 
-const SYSTEM = `Tu es un tuteur qui aide des élèves (collège / lycée, France) à faire leurs devoirs EN AVANCE.
-Ton rôle : traiter l'exercice ou le devoir demandé et MONTRER toute la démarche, étape par étape, comme le ferait un bon professeur.
-Règles :
-- Explique le raisonnement, pas seulement le résultat final.
-- Français clair, notation adaptée au niveau scolaire.
-- Si l'énoncé est incomplet ou ambigu, dis d'abord ce qui manque, puis propose l'hypothèse la plus probable et continue.
-- Structure : compréhension de l'énoncé → étapes de résolution → résultat → court "À retenir".
-- Tu aides l'élève à comprendre et à rédiger son travail ; ne promets jamais de note.`;
+const SYSTEM = `Tu FAIS le devoir d'un élève (collège / lycée, France), en entier, prêt à être rendu.
+
+- La réponse EST le devoir terminé : un travail rédigé et complet, pas des conseils, pas de "je vais t'aider".
+- Montre les calculs et le raisonnement là où un correcteur les attend, mais SANS méta-commentaire : pas de "comprenons l'énoncé", "analysons", "à retenir", "pense à réviser".
+- Présentation soignée et aérée :
+  · intitulés courts en **gras** (n'utilise PAS de titres Markdown avec #).
+  · étapes numérotées quand il y a une démarche.
+  · le résultat final sur sa propre ligne, en évidence.
+- Maths / physique / chimie : notation LaTeX — $ ... $ en ligne, $$ ... $$ pour un calcul isolé.
+- Français clair au niveau de l'élève. Longueur juste : ni bâclé, ni délayé.
+- Rédaction (dissertation, commentaire, essai) : rends le texte fini et structuré (introduction, développement, conclusion), pas un plan.
+- Énoncé ambigu ou incomplet : prends l'hypothèse la plus raisonnable, signale-la en une ligne au début, puis fais le devoir.`;
 
 const cors: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',

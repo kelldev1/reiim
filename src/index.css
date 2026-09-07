@@ -149,6 +149,22 @@
   }
 }
 
+/* Réponses de l'assistant : maths en bloc qui scrollent au lieu de casser la carte */
+.reiim-md .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 0;
+}
+.reiim-md .katex {
+  font-size: 1.02em;
+}
+.reiim-md > :first-child {
+  margin-top: 0;
+}
+.reiim-md > :last-child {
+  margin-bottom: 0;
+}
+
 @layer utilities {
   .text-primary {
     color: rgba(255, 255, 255, 0.82);

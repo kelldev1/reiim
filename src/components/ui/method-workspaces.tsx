@@ -1,9 +1,15 @@
 import React, { useState } from 'react';
-import { Check, Plus, Sparkles, X } from 'lucide-react';
+import { Check, Copy, Plus, Sparkles, X } from 'lucide-react';
 import { useWork } from '@/lib/devoir-work';
 import { useAuth } from '@/lib/auth';
 import { askAI, AIError } from '@/lib/ai';
 import { Loader } from '@/components/ui/loader';
+
+// Chargé à la demande : react-markdown + KaTeX pèsent ~400 Ko, inutiles tant
+// qu'on n'a pas ouvert un espace « Exercices pratiques » avec une réponse.
+const Markdown = React.lazy(() =>
+  import('@/components/ui/markdown').then((m) => ({ default: m.Markdown })),
+);
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
@@ -454,7 +460,7 @@ const SynthesisWorkspace: React.FC<{ workKey: string }> = ({ workKey }) => {
   );
 };
 
-/* ---------- Exercices pratiques : faire l'exercice avec l'assistant ---------- */
+/* ---------- Exercices pratiques : l'assistant fait le devoir ---------- */
 
 type ExerciseWork = { brief: string; answer: string };
 
@@ -466,6 +472,7 @@ const ExerciseWorkspace: React.FC<{ workKey: string; subject: string }> = ({
   const [d, set] = useWork<ExerciseWork>(workKey, 'exercices', { brief: '', answer: '' });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const run = async () => {
     if (busy || !d.brief.trim()) return;
@@ -482,11 +489,21 @@ const ExerciseWorkspace: React.FC<{ workKey: string; subject: string }> = ({
     }
   };
 
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(d.answer);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* presse-papiers indisponible */
+    }
+  };
+
   const noCredits = !!user && user.credits <= 0;
 
   return (
     <div className="flex flex-col gap-3">
-      <SectionLabel>Faire l'exercice avec l'assistant</SectionLabel>
+      <SectionLabel>Faire le devoir</SectionLabel>
       <textarea
         value={d.brief}
         onChange={(e) => set((p) => ({ ...p, brief: e.target.value }))}
@@ -504,7 +521,7 @@ const ExerciseWorkspace: React.FC<{ workKey: string; subject: string }> = ({
           style={{ backgroundColor: 'rgb(var(--color-fg))', color: 'rgb(var(--color-bg))' }}
         >
           <Sparkles className="h-3.5 w-3.5" />
-          {busy ? 'Résolution…' : "M'aider à le faire"}
+          {busy ? 'Rédaction…' : d.answer ? 'Refaire' : 'Faire le devoir'}
         </button>
         {busy && <Loader variant="dots" size={18} />}
         {user && (
@@ -527,18 +544,38 @@ const ExerciseWorkspace: React.FC<{ workKey: string; subject: string }> = ({
 
       {d.answer && (
         <div
-          className="whitespace-pre-wrap rounded-lg border p-3 text-sm leading-relaxed text-primary"
+          className="overflow-hidden rounded-xl border"
           style={{
             borderColor: 'rgb(var(--color-fg) / 0.12)',
             backgroundColor: 'rgb(var(--color-fg) / 0.03)',
           }}
         >
-          {d.answer}
+          <div
+            className="flex items-center justify-between border-b px-3 py-2"
+            style={{ borderColor: 'rgb(var(--color-fg) / 0.1)' }}
+          >
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted">
+              Devoir rédigé
+            </span>
+            <button
+              type="button"
+              onClick={copy}
+              className="flex items-center gap-1 text-xs text-muted transition-colors hover:text-primary"
+            >
+              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied ? 'Copié' : 'Copier'}
+            </button>
+          </div>
+          <div className="px-3.5 py-3">
+            <React.Suspense fallback={<Loader variant="dots" size={16} />}>
+              <Markdown>{d.answer}</Markdown>
+            </React.Suspense>
+          </div>
         </div>
       )}
 
       <p className="text-[11px] text-muted-soft">
-        L'assistant détaille la démarche pour que tu comprennes et rédiges toi-même.
+        Le devoir est rédigé en entier. Relis-le, vérifie, et adapte-le à ta façon d'écrire.
       </p>
     </div>
   );
