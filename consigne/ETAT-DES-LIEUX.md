@@ -1,6 +1,6 @@
 # reiim — état des lieux
 
-_Dernière mise à jour : 2026-09-07 (soir — Supabase configuré, retour à Claude après un détour Mistral)._
+_Dernière mise à jour : 2026-09-08 (assistant IA opérationnel ; prochain chantier = espaces des méthodes d'apprentissage, on commence par « Vidéos »)._
 _Ce fichier sert de mémoire entre les sessions. Le lire en premier à la reprise._
 
 ## Projet Supabase (réel, en place)
@@ -108,24 +108,36 @@ Claude**, l'utilisateur met 5 € de crédit sur la console Anthropic.
 
 ---
 
-## 3. OÙ ON S'ARRÊTE — prochaine étape immédiate
+## 3. OÙ ON S'ARRÊTE — prochaine étape
 
-Supabase est configuré. Il reste à **brancher la clé Anthropic** :
+L'assistant IA **marche** (testé bout-en-bout : réponse, débit crédit, log, PDF, rendu
+Markdown/KaTeX, atelier plein écran). Clé Anthropic branchée (secret `LLM_API_KEY`),
+5 € de crédit sur la console Anthropic.
 
-1. **console.anthropic.com → Billing** : ajouter **5 € de crédit**.
-2. **console.anthropic.com → API keys** : créer une **nouvelle** clé (`sk-ant-…`).
-   ⚠️ NE PAS réutiliser l'ancienne clé collée dans le chat au début de session (compromise).
-3. Mettre à jour le secret Supabase :
-   `npx supabase secrets set LLM_API_KEY=sk-ant-… --project-ref qfnekebcpapprfhjqrry`
-   (ou Dashboard → Edge Functions → Secrets → éditer `LLM_API_KEY`).
-4. Redéployer : `npx supabase functions deploy ai --project-ref qfnekebcpapprfhjqrry --use-api`
-5. (option) Anthropic Console → **Limits** : fixer un plafond de dépense mensuel bas.
+**Prochain chantier : coder les espaces de travail des méthodes d'apprentissage.**
+Ordre : on commence par **« Vidéos explicatives »**.
 
-Puis tester : connecté sur `localhost:3000` → Calendrier → glisser un devoir → matière +
-« Exercices pratiques » → Planifier → coller un énoncé → « M'aider à le faire »
-(consomme 1 crédit ; 5 crédits offerts à l'inscription).
+**Décision prise (2026-09-08)** : intégration **YouTube via l'API YouTube Data v3**
+(pas de génération de vidéo). L'utilisateur a dit « fais rien pour l'instant, on reprend
+après » juste après avoir choisi cette option — donc **RIEN n'est encore codé**.
 
-Redonner des crédits pendant les tests (SQL Editor) :
+Plan pour « Vidéos explicatives » (à faire) :
+- Nouvelle Edge Function `supabase/functions/videos/index.ts` : vérifie le JWT → appelle
+  `youtube/v3/search` (+ `videos` pour durées) avec `regionCode=FR`, `relevanceLanguage=fr`
+  → renvoie une liste nettoyée (id, titre, chaîne, miniature, durée, vues). Pas de crédit
+  débité (quota YouTube = 10 000 u/j, search = 100 u). Boost d'une allowlist de chaînes
+  pédago FR (Yvan Monka / Maths et tiques, Les Bons Profs, Physique-Chimie facile…).
+- Secret **`YT_API_KEY`** (clé Google Cloud gratuite, API YouTube Data v3, sans carte) +
+  `[functions.videos] verify_jwt = true` dans `config.toml`.
+- `src/lib/videos.ts` (`searchVideos()`), et dans `method-workspaces.tsx` remplacer le
+  `StudyReminder` de la méthode `vidéos` par un vrai `VideoWorkspace` (champ chapitre +
+  bouton Trouver → cartes résultats → lecteur `<iframe>` intégré + cases « vu » + notes) ;
+  retirer `vidéos` de `METHOD_HINTS`.
+
+Après vidéos, méthodes restantes sans espace : Lecture & notes, Flashcards & mémorisation,
+Simulations & labos (voir tableau §2 — l'utilisateur décidera lesquelles méritent un espace).
+
+Redonner des crédits IA pendant les tests (SQL Editor) :
 `update public.profiles set credits = 100 where email = 'kelian.luye@gmail.com';`
 
 ### Ensuite (backlog commercialisation, dans SETUP.md aussi)
