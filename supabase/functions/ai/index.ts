@@ -79,12 +79,16 @@ Deno.serve(async (req: Request) => {
     prompt?: unknown;
     subject?: unknown;
     feature?: unknown;
+    pdf?: unknown;
   };
   const prompt = String(body.prompt ?? '').trim();
   const subject = String(body.subject ?? '').trim();
   const feature = String(body.feature ?? 'exercices').slice(0, 40);
-  if (!prompt) return json({ error: 'empty-prompt' }, 400);
+  // PDF de l'énoncé, encodé base64 (sans le préfixe data:).
+  const pdf = typeof body.pdf === 'string' ? body.pdf : '';
+  if (!prompt && !pdf) return json({ error: 'empty-prompt' }, 400);
   if (prompt.length > 8000) return json({ error: 'prompt-too-long' }, 400);
+  if (pdf.length > 9_000_000) return json({ error: 'pdf-too-large' }, 400);
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
@@ -104,9 +108,19 @@ Deno.serve(async (req: Request) => {
   if (deductErr) return json({ error: 'server' }, 500);
   if (remaining === -1) return json({ error: 'no-credits' }, 402);
 
-  const userContent = subject
-    ? `Matière : ${subject}\n\nÉnoncé / devoir :\n${prompt}`
-    : prompt;
+  const intro = subject ? `Matière : ${subject}\n\n` : '';
+  const text = pdf
+    ? `${intro}${prompt || "Fais le devoir de l'énoncé joint (PDF), en entier."}`
+    : `${intro}Énoncé / devoir :\n${prompt}`;
+
+  const userContent: any[] = [];
+  if (pdf) {
+    userContent.push({
+      type: 'document',
+      source: { type: 'base64', media_type: 'application/pdf', data: pdf },
+    });
+  }
+  userContent.push({ type: 'text', text });
 
   const anthropic = new Anthropic({ apiKey: LLM_API_KEY });
 

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Check, Copy, Plus, Sparkles, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Check, Copy, FileUp, Plus, Sparkles, X } from 'lucide-react';
 import { useWork } from '@/lib/devoir-work';
 import { useAuth } from '@/lib/auth';
 import { askAI, AIError } from '@/lib/ai';
@@ -462,24 +462,71 @@ const SynthesisWorkspace: React.FC<{ workKey: string }> = ({ workKey }) => {
 
 /* ---------- Exercices pratiques : l'assistant fait le devoir ---------- */
 
-type ExerciseWork = { brief: string; answer: string };
+type ExerciseWork = { brief: string; answer: string; pdfName?: string };
 
-const ExerciseWorkspace: React.FC<{ workKey: string; subject: string }> = ({
+const readB64 = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] ?? '');
+    r.onerror = () => reject(new Error('read-failed'));
+    r.readAsDataURL(file);
+  });
+
+const ExerciseWorkspace: React.FC<{ workKey: string; subject: string; fill?: boolean }> = ({
   workKey,
   subject,
+  fill = false,
 }) => {
   const { user, refreshProfile } = useAuth();
   const [d, set] = useWork<ExerciseWork>(workKey, 'exercices', { brief: '', answer: '' });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // PDF gardé en mémoire pour la session (trop lourd pour localStorage — voir backlog).
+  const [pdf, setPdf] = useState<{ b64: string; url: string; name: string } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(
+    () => () => {
+      if (pdf) URL.revokeObjectURL(pdf.url);
+    },
+    [pdf],
+  );
+
+  const pickPdf = async (file: File | undefined) => {
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+      setErr('Choisis un fichier PDF.');
+      return;
+    }
+    if (file.size > 6 * 1024 * 1024) {
+      setErr('PDF trop lourd (max 6 Mo).');
+      return;
+    }
+    setErr(null);
+    try {
+      const b64 = await readB64(file);
+      setPdf((prev) => {
+        if (prev) URL.revokeObjectURL(prev.url);
+        return { b64, url: URL.createObjectURL(file), name: file.name };
+      });
+      set((p) => ({ ...p, pdfName: file.name }));
+    } catch {
+      setErr('Lecture du PDF impossible.');
+    }
+  };
 
   const run = async () => {
-    if (busy || !d.brief.trim()) return;
+    if (busy || (!d.brief.trim() && !pdf)) return;
     setBusy(true);
     setErr(null);
     try {
-      const { answer } = await askAI({ feature: 'exercices', subject, prompt: d.brief });
+      const { answer } = await askAI({
+        feature: 'exercices',
+        subject,
+        prompt: d.brief,
+        pdf: pdf?.b64,
+      });
       set((p) => ({ ...p, answer }));
       void refreshProfile();
     } catch (e) {
@@ -500,23 +547,110 @@ const ExerciseWorkspace: React.FC<{ workKey: string; subject: string }> = ({
   };
 
   const noCredits = !!user && user.credits <= 0;
+  const canRun = !busy && !noCredits && (!!d.brief.trim() || !!pdf);
+  const box = fill ? 'min-h-0 flex-1' : '';
 
-  return (
-    <div className="flex flex-col gap-3">
-      <SectionLabel>Faire le devoir</SectionLabel>
+  const enonce = (
+    <div className="flex min-h-0 flex-col gap-2">
+      <SectionLabel>Énoncé</SectionLabel>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/pdf"
+        className="hidden"
+        onChange={(e) => {
+          void pickPdf(e.target.files?.[0]);
+        }}
+      />
+      {pdf ? (
+        <>
+          <object
+            data={pdf.url}
+            type="application/pdf"
+            className={`w-full rounded-lg border ${fill ? box : 'h-[300px]'}`}
+            style={{ borderColor: 'rgb(var(--color-fg) / 0.15)' }}
+          >
+            <p className="p-3 text-xs text-muted">
+              Aperçu indisponible —{' '}
+              <a href={pdf.url} target="_blank" rel="noreferrer" className="underline">
+                ouvrir « {pdf.name} »
+              </a>
+            </p>
+          </object>
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="self-start text-xs text-muted transition-colors hover:text-primary"
+          >
+            Changer le PDF
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className={`flex flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed text-sm text-muted transition-colors hover:text-primary ${
+            fill ? box : 'h-[140px]'
+          }`}
+          style={{ borderColor: 'rgb(var(--color-fg) / 0.25)' }}
+        >
+          <FileUp className="h-5 w-5" />
+          Ajouter le PDF de l'exercice
+          {d.pdfName && (
+            <span className="text-[11px] text-muted-soft">à ré-ouvrir : {d.pdfName}</span>
+          )}
+        </button>
+      )}
       <textarea
         value={d.brief}
         onChange={(e) => set((p) => ({ ...p, brief: e.target.value }))}
-        rows={4}
-        placeholder="Colle l'énoncé de l'exercice ou du devoir…"
-        className={`${inputCls} resize-none`}
+        rows={3}
+        placeholder={
+          pdf ? 'Consigne ou précisions (optionnel)…' : "Colle l'énoncé, ou ajoute un PDF ci-dessus…"
+        }
+        className={`${inputCls} shrink-0 resize-none`}
         style={inputStyle}
       />
-      <div className="flex flex-wrap items-center gap-3">
+    </div>
+  );
+
+  const corrige = (
+    <div className="flex min-h-0 flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <SectionLabel>Devoir rédigé</SectionLabel>
+        {d.answer && (
+          <button
+            type="button"
+            onClick={copy}
+            className="flex items-center gap-1 text-xs text-muted transition-colors hover:text-primary"
+          >
+            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? 'Copié' : 'Copier'}
+          </button>
+        )}
+      </div>
+      <div
+        className={`overflow-y-auto rounded-lg border p-4 ${fill ? box : 'max-h-[440px] min-h-[120px]'}`}
+        style={{
+          borderColor: 'rgb(var(--color-fg) / 0.12)',
+          backgroundColor: 'rgb(var(--color-fg) / 0.03)',
+        }}
+      >
+        {d.answer ? (
+          <React.Suspense fallback={<Loader variant="dots" size={16} />}>
+            <Markdown>{d.answer}</Markdown>
+          </React.Suspense>
+        ) : (
+          <p className="text-sm text-muted">
+            {busy ? 'Rédaction en cours…' : 'Le devoir rédigé apparaîtra ici.'}
+          </p>
+        )}
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={run}
-          disabled={busy || !d.brief.trim() || noCredits}
+          disabled={!canRun}
           className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
           style={{ backgroundColor: 'rgb(var(--color-fg))', color: 'rgb(var(--color-bg))' }}
         >
@@ -530,53 +664,26 @@ const ExerciseWorkspace: React.FC<{ workKey: string; subject: string }> = ({
           </span>
         )}
       </div>
-
       {noCredits && !err && (
-        <p className="text-xs text-muted">
+        <p className="shrink-0 text-xs text-muted">
           Tu n'as plus de crédits — passe à une offre pour continuer.
         </p>
       )}
       {err && (
-        <p className="text-xs" style={{ color: 'rgb(239 68 68)' }}>
+        <p className="shrink-0 text-xs" style={{ color: 'rgb(239 68 68)' }}>
           {err}
         </p>
       )}
-
-      {d.answer && (
-        <div
-          className="overflow-hidden rounded-xl border"
-          style={{
-            borderColor: 'rgb(var(--color-fg) / 0.12)',
-            backgroundColor: 'rgb(var(--color-fg) / 0.03)',
-          }}
-        >
-          <div
-            className="flex items-center justify-between border-b px-3 py-2"
-            style={{ borderColor: 'rgb(var(--color-fg) / 0.1)' }}
-          >
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted">
-              Devoir rédigé
-            </span>
-            <button
-              type="button"
-              onClick={copy}
-              className="flex items-center gap-1 text-xs text-muted transition-colors hover:text-primary"
-            >
-              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-              {copied ? 'Copié' : 'Copier'}
-            </button>
-          </div>
-          <div className="px-3.5 py-3">
-            <React.Suspense fallback={<Loader variant="dots" size={16} />}>
-              <Markdown>{d.answer}</Markdown>
-            </React.Suspense>
-          </div>
-        </div>
-      )}
-
-      <p className="text-[11px] text-muted-soft">
+      <p className="shrink-0 text-[11px] text-muted-soft">
         Le devoir est rédigé en entier. Relis-le, vérifie, et adapte-le à ta façon d'écrire.
       </p>
+    </div>
+  );
+
+  return (
+    <div className={`grid gap-5 lg:grid-cols-2 ${fill ? 'min-h-0 flex-1' : ''}`}>
+      {enonce}
+      {corrige}
     </div>
   );
 };
@@ -609,10 +716,11 @@ export const MethodWorkspace: React.FC<{
   method: string;
   workKey: string;
   subject: string;
-}> = ({ method, workKey, subject }) => {
+  fill?: boolean;
+}> = ({ method, workKey, subject, fill }) => {
   switch (method) {
     case 'exercices':
-      return <ExerciseWorkspace workKey={workKey} subject={subject} />;
+      return <ExerciseWorkspace workKey={workKey} subject={subject} fill={fill} />;
     case 'projets':
       return <ProjectWorkspace workKey={workKey} />;
     case 'discussion':

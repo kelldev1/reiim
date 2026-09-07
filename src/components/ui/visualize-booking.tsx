@@ -278,6 +278,8 @@ const LearningSelectionCard: React.FC<{
   // Keep method order stable (as declared in METHODS) so the stacked workspaces
   // don't jump around when toggled.
   const orderedMethods = METHODS.filter((m) => methods.includes(m.value)).map((m) => m.value);
+  // Mode plein écran : « Exercices pratiques » seul → énoncé PDF à gauche, corrigé à droite.
+  const bigMode = !setup && orderedMethods.length === 1 && orderedMethods[0] === 'exercices';
 
   const toggleMethod = (value: string) => {
     setMethods((prev) => (prev.includes(value) ? prev.filter((x) => x !== value) : [...prev, value]));
@@ -313,7 +315,9 @@ const LearningSelectionCard: React.FC<{
         exit={{ scale: 0.96, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 300, damping: 26 }}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-lg rounded-2xl border shadow-xl"
+        className={`relative w-full rounded-2xl border shadow-xl ${
+          bigMode ? 'max-w-[1400px]' : 'max-w-lg'
+        }`}
         style={{ backgroundColor: 'rgb(var(--color-surface))', borderColor: 'rgb(var(--color-fg) / 0.12)' }}
       >
         <button
@@ -324,7 +328,11 @@ const LearningSelectionCard: React.FC<{
           ×
         </button>
 
-        <div className="flex max-h-[85vh] flex-col gap-5 overflow-y-auto p-6">
+        <div
+          className={`flex flex-col gap-5 p-6 ${
+            bigMode ? 'h-[92vh]' : 'max-h-[85vh] overflow-y-auto'
+          }`}
+        >
           <div>
             <h3 className="text-lg font-semibold text-primary">
               {setup ? 'Planifier un devoir' : 'Espace de travail'}
@@ -467,11 +475,13 @@ const LearningSelectionCard: React.FC<{
                 </button>
               </div>
 
-              <div className="flex flex-col gap-4">
+              <div className={`flex flex-col gap-4 ${bigMode ? 'min-h-0 flex-1' : ''}`}>
                 {orderedMethods.map((m, i) => (
                   <div
                     key={m}
-                    className={i > 0 ? 'border-t pt-4' : ''}
+                    className={`${i > 0 ? 'border-t pt-4' : ''} ${
+                      bigMode ? 'flex min-h-0 flex-1 flex-col' : ''
+                    }`}
                     style={i > 0 ? { borderColor: 'rgb(var(--color-fg) / 0.1)' } : undefined}
                   >
                     {orderedMethods.length > 1 && (
@@ -483,6 +493,7 @@ const LearningSelectionCard: React.FC<{
                       method={m}
                       workKey={workKey}
                       subject={subMeta?.label ?? subject}
+                      fill={bigMode}
                     />
                   </div>
                 ))}

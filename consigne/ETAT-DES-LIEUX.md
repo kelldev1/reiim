@@ -77,7 +77,7 @@ indexés par jour × slot méthode.
 
 | Méthode | Espace |
 |---|---|
-| **Exercices pratiques** (`exercices`) | **Assistant IA** : colle l'énoncé → « M'aider à le faire » → réponse détaillée + démarche. Décompte des crédits. |
+| **Exercices pratiques** (`exercices`) | **Assistant IA qui FAIT le devoir**. Si c'est la seule méthode → carte **plein écran** en 2 colonnes : à gauche l'**énoncé** (upload d'un **PDF** visualisé + zone texte), à droite le **corrigé** rendu en Markdown + maths KaTeX, bouton **Copier**. Bouton « Faire le devoir » / « Refaire ». Le PDF est envoyé tel quel à Claude (document block). Décompte des crédits. PDF gardé en mémoire (pas persisté — voir backlog). |
 | Projets concrets (`projets`) | Checklist d'étapes + barre de progression |
 | Étude en groupe (`discussion`) | Quand / Où, participants (chips), points à aborder |
 | Cartes mentales (`mindmap`) | Arbre d'idées (5 niveaux) |
@@ -133,6 +133,8 @@ Redonner des crédits pendant les tests (SQL Editor) :
 - [ ] **Captcha** inscription (hCaptcha, gratuit)
 - [ ] **Streaming** de la réponse IA (SSE depuis la fonction) pour l'UX
 - [ ] **RGPD** : mentions légales, consentement, région Supabase `eu-*`
+- [ ] **PDF persistant** : bucket Supabase Storage (RLS par user) au lieu du blob en mémoire
+      — actuellement le PDF de l'énoncé est reperdu au rechargement de la page
 - [ ] Brancher d'autres méthodes sur l'assistant si utile (l'utilisateur avait dit :
       exercices + peut-être générer des exos d'entraînement / corriger)
 - [ ] Bundle JS = 1 MB (293 KB gzip) depuis l'ajout de supabase-js → code-splitting
