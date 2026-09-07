@@ -1,23 +1,28 @@
 // reiim — AI proxy Edge Function.
 //
-// The model API key lives ONLY here (set with `supabase secrets set ANTHROPIC_API_KEY=...`).
-// The browser never sees it. Before every model call this function:
-//   1. verifies the caller's Supabase JWT
-//   2. soft rate-limits (1 request / 5 s per user)
-//   3. atomically spends one AI credit (refunds it if the model call fails)
-//   4. logs token usage
+// Fournisseur : Anthropic (Claude). Le navigateur ne parle jamais au modèle :
+// il passe par cette fonction qui détient la clé API et, avant chaque appel :
+//   1. vérifie le JWT Supabase de l'appelant
+//   2. rate-limit doux (1 requête / 5 s par utilisateur)
+//   3. dépense 1 crédit (atomique ; remboursé si l'appel échoue)
+//   4. logue la consommation de tokens
 //
-// Deploy:  supabase functions deploy ai
+// La clé vit UNIQUEMENT ici : `supabase secrets set LLM_API_KEY=sk-ant-...`
+// (crédits sur https://console.anthropic.com/settings/billing).
+//
+// Changer de modèle : la constante MODEL ci-dessous
+// (claude-sonnet-5 ≈ 2 $/1M entrée, 10 $/1M sortie ; claude-opus-5 plus puissant, plus cher).
 //
 // deno-lint-ignore-file no-explicit-any
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import Anthropic from 'npm:@anthropic-ai/sdk';
+import Anthropic from 'npm:@anthropic-ai/sdk@0.124.0';
 
-// Cost / quality knob. Sonnet 5 with medium effort ≈ 1.5–2.5 centimes / requête.
 const MODEL = 'claude-sonnet-5';
-const EFFORT: 'low' | 'medium' | 'high' | 'xhigh' | 'max' = 'medium';
-const MAX_TOKENS = 6000;
+// Marge pour la réflexion "adaptive" + la réponse rédigée.
+const MAX_TOKENS = 4000;
+// low | medium | high | xhigh | max — compromis coût / qualité pour un devoir.
+const EFFORT = 'medium';
 const RATE_WINDOW_MS = 5000;
 
 const SYSTEM = `Tu es un tuteur qui aide des élèves (collège / lycée, France) à faire leurs devoirs EN AVANCE.
@@ -31,7 +36,7 @@ Règles :
 
 const cors: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
@@ -48,8 +53,8 @@ Deno.serve(async (req: Request) => {
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
   const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
   const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!SUPABASE_URL || !ANON_KEY || !SERVICE_KEY || !ANTHROPIC_API_KEY) {
+  const LLM_API_KEY = Deno.env.get('LLM_API_KEY');
+  if (!SUPABASE_URL || !ANON_KEY || !SERVICE_KEY || !LLM_API_KEY) {
     return json({ error: 'server-misconfigured' }, 500);
   }
 
@@ -95,48 +100,62 @@ Deno.serve(async (req: Request) => {
   if (deductErr) return json({ error: 'server' }, 500);
   if (remaining === -1) return json({ error: 'no-credits' }, 402);
 
+  const userContent = subject
+    ? `Matière : ${subject}\n\nÉnoncé / devoir :\n${prompt}`
+    : prompt;
+
+  const anthropic = new Anthropic({ apiKey: LLM_API_KEY });
+
   try {
-    const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
-    const message: any = await anthropic.messages.create({
+    const msg: any = await anthropic.messages.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      thinking: { type: 'adaptive' },
+      system: SYSTEM,
       output_config: { effort: EFFORT },
-      system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
-      messages: [
-        {
-          role: 'user',
-          content: subject
-            ? `Matière : ${subject}\n\nÉnoncé / devoir :\n${prompt}`
-            : prompt,
-        },
-      ],
-    });
+      messages: [{ role: 'user', content: userContent }],
+    } as any);
 
-    if (message.stop_reason === 'refusal') {
+    if (msg.stop_reason === 'refusal') {
       await admin.rpc('refund_ai_credit', { p_user: user.id });
-      return json({ error: 'refused' }, 422);
+      const cat = msg.stop_details?.category ?? 'refusal';
+      return json({ error: 'refused', detail: String(cat) }, 422);
     }
 
-    const answer = (message.content as any[])
-      .filter((b) => b.type === 'text')
+    const answer = ((msg.content ?? []) as any[])
+      .filter((b) => b?.type === 'text')
       .map((b) => b.text as string)
       .join('\n')
       .trim();
+
+    if (!answer) {
+      await admin.rpc('refund_ai_credit', { p_user: user.id });
+      return json({ error: 'refused', detail: msg.stop_reason ?? 'empty-response' }, 422);
+    }
 
     await admin.from('ai_usage').insert({
       user_id: user.id,
       feature,
       model: MODEL,
-      input_tokens: message.usage?.input_tokens ?? null,
-      output_tokens: message.usage?.output_tokens ?? null,
-      cached_input_tokens: message.usage?.cache_read_input_tokens ?? 0,
+      input_tokens: msg.usage?.input_tokens ?? null,
+      output_tokens: msg.usage?.output_tokens ?? null,
+      cached_input_tokens: msg.usage?.cache_read_input_tokens ?? 0,
     });
 
     return json({ answer, creditsLeft: remaining });
   } catch (err) {
     await admin.rpc('refund_ai_credit', { p_user: user.id });
-    const status = (err as { status?: number })?.status ?? null;
-    return json({ error: 'ai-failed', status }, 502);
+
+    if (err instanceof Anthropic.APIError) {
+      const status = err.status ?? null;
+      const detail = String(err.message ?? 'api-error').slice(0, 400);
+      console.error('llm-error', status, detail);
+      // 429 → on le relaie tel quel pour que le front dise "doucement".
+      if (status === 429) return json({ error: 'rate-limit' }, 429);
+      return json({ error: 'ai-failed', status, detail }, 502);
+    }
+
+    const detail = String((err as Error)?.message ?? err).slice(0, 400);
+    console.error('ai-failed', detail);
+    return json({ error: 'ai-failed', status: null, detail }, 502);
   }
 });

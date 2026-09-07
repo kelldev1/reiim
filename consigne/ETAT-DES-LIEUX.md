@@ -1,7 +1,17 @@
 # reiim — état des lieux
 
-_Dernière mise à jour : 2026-09-07 (pause, reprise prévue le lendemain)._
+_Dernière mise à jour : 2026-09-07 (soir — Supabase configuré, retour à Claude après un détour Mistral)._
 _Ce fichier sert de mémoire entre les sessions. Le lire en premier à la reprise._
+
+## Projet Supabase (réel, en place)
+
+- **Project ref** : `qfnekebcpapprfhjqrry` — région `eu-west-3` (Paris) — org `egomania1's Org`.
+- URL : `https://qfnekebcpapprfhjqrry.supabase.co` (dans `.env`, avec l'anon key).
+- Migration `20260907120000_init.sql` : **exécutée** (SQL Editor, "Success").
+- Edge Function `ai` : **déployée** (`npx supabase functions deploy ai --project-ref qfnekebcpapprfhjqrry --use-api`).
+- Secret `LLM_API_KEY` : présent (contenait la clé Mistral — **à remplacer par la clé Anthropic**).
+- « Confirm email » : **désactivé** (pour tester — à réactiver avant lancement).
+- Compte test : `kelian.luye@gmail.com`.
 
 ---
 
@@ -75,35 +85,46 @@ indexés par jour × slot méthode.
 | Lecture active & synthèse (`lecture_active`) | Idées clés / Questions / synthèse |
 | Vidéos, Lecture & notes, Flashcards, Simulations & labos | Encadré « Méthode de révision » (rien à préparer) |
 
-### Backend IA (créé le 2026-09-07, PAS ENCORE DÉPLOYÉ — voir §3)
+### Backend IA (déployé le 2026-09-07)
 - `supabase/migrations/20260907120000_init.sql` : tables `profiles` + `ai_usage`, RLS,
-  triggers, fonctions `deduct_ai_credit` / `refund_ai_credit`.
+  triggers, fonctions `deduct_ai_credit` / `refund_ai_credit`. **Exécutée.**
 - `supabase/functions/ai/index.ts` : proxy Edge Function. Vérifie JWT → rate-limit
   1 req/5 s → débite 1 crédit (atomique, remboursé si échec) → **Claude Sonnet 5**
-  (`claude-sonnet-5`, effort `medium`, max 6000 tokens, prompt système caché) → logue
-  les tokens. **La clé API vit uniquement là.**
-- `src/lib/supabase.ts` (client), `src/lib/ai.ts` (`askAI()`).
-- `SETUP.md` à la racine = la marche à suivre pour l'utilisateur.
+  (`claude-sonnet-5`, effort `medium`, `max_tokens` 4000, prompt système caché,
+  SDK `npm:@anthropic-ai/sdk@0.124.0`) → logue les tokens. **La clé API vit uniquement là**
+  (secret `LLM_API_KEY`).
+- `src/lib/supabase.ts` (client), `src/lib/ai.ts` (`askAI()` — ajoute l'entête `apikey`).
+- `SETUP.md` à la racine = la marche à suivre.
+
+**Détour Mistral (abandonné).** Entre-temps on a essayé Mistral (offre gratuite, pour
+éviter de payer). Échec : l'API Mistral renvoie `x-ratelimit-limit-req-minute: 0` tant
+qu'on n'a pas « Activé PAYG » (infos de facturation **+ carte** obligatoires) — l'offre
+« Gratuit » seule ne donne aucun accès API. Gemini : indispo en France. Donc **retour à
+Claude**, l'utilisateur met 5 € de crédit sur la console Anthropic.
 
 **Build + typecheck : VERTS.** L'Edge Function (Deno) n'est pas typecheckée localement.
-Rien n'a été testé en runtime cette session (l'utilisateur teste lui-même).
 
 ---
 
 ## 3. OÙ ON S'ARRÊTE — prochaine étape immédiate
 
-**L'utilisateur doit configurer Supabase** (≈15 min, gratuit) en suivant `SETUP.md` :
-1. Créer projet Supabase → `.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`)
-2. `supabase link` → `supabase db push` → `supabase secrets set ANTHROPIC_API_KEY=…`
-   → `supabase functions deploy ai`
-3. Dashboard : désactiver « Confirm email » pour tester vite
-4. Anthropic Console : fixer un **plafond de dépense mensuel**
+Supabase est configuré. Il reste à **brancher la clé Anthropic** :
 
-⚠️ Tant que ce n'est pas fait, `npm run dev` reste bloqué sur l'écran de connexion
-(normal — la fausse auth locale a été retirée).
+1. **console.anthropic.com → Billing** : ajouter **5 € de crédit**.
+2. **console.anthropic.com → API keys** : créer une **nouvelle** clé (`sk-ant-…`).
+   ⚠️ NE PAS réutiliser l'ancienne clé collée dans le chat au début de session (compromise).
+3. Mettre à jour le secret Supabase :
+   `npx supabase secrets set LLM_API_KEY=sk-ant-… --project-ref qfnekebcpapprfhjqrry`
+   (ou Dashboard → Edge Functions → Secrets → éditer `LLM_API_KEY`).
+4. Redéployer : `npx supabase functions deploy ai --project-ref qfnekebcpapprfhjqrry --use-api`
+5. (option) Anthropic Console → **Limits** : fixer un plafond de dépense mensuel bas.
 
-Après config, tester : créer un compte → Calendrier → glisser un devoir → matière +
-« Exercices pratiques » → Planifier → coller un énoncé → « M'aider à le faire ».
+Puis tester : connecté sur `localhost:3000` → Calendrier → glisser un devoir → matière +
+« Exercices pratiques » → Planifier → coller un énoncé → « M'aider à le faire »
+(consomme 1 crédit ; 5 crédits offerts à l'inscription).
+
+Redonner des crédits pendant les tests (SQL Editor) :
+`update public.profiles set credits = 100 where email = 'kelian.luye@gmail.com';`
 
 ### Ensuite (backlog commercialisation, dans SETUP.md aussi)
 - [ ] **Paiement** : Lemon Squeezy (merchant of record, gère la TVA UE) ou Stripe +
@@ -135,6 +156,14 @@ Après config, tester : créer un compte → Calendrier → glisser un devoir �
 
 ## 5. Points d'attention / pièges connus
 
+- **Mistral offre gratuite = piège** : l'API renvoie `429 "Rate limit exceeded"` avec
+  `x-ratelimit-limit-req-minute: 0` en permanence tant que « PAYG » n'est pas activé
+  (carte bancaire obligatoire). Le plan « Gratuit » et la vérif téléphone ne suffisent
+  pas. Ne pas y retourner sans carte.
+- **Déploiement Edge Function** : `--use-api` évite Docker. `npx supabase login` ne marche
+  PAS en non-TTY (il faut le vrai terminal de l'utilisateur). Le dashboard Supabase
+  (pages Edge Functions → Code / Logs) était cassé toute la session (cascade Usercentrics) ;
+  Secrets et SQL Editor marchaient.
 - **`prefers-reduced-motion` + framer-motion@10 + React.StrictMode** = pages figées à
   `opacity:0` (blanches). Corrigé le 2026-09-07 : `<React.StrictMode>` retiré de
   `main.tsx`, `AnimatePresence mode="wait"` retiré partout (deadlock), `<MotionConfig
