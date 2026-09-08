@@ -11,6 +11,7 @@ import {
   Play,
   Plus,
   Search,
+  Share2,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -293,7 +294,7 @@ const GroupWorkspace: React.FC<{ workKey: string }> = ({ workKey }) => {
   );
 };
 
-/* ---------- Cartes mentales ---------- */
+/* ---------- Cartes mentales : carte radiale ---------- */
 
 type MindNode = { id: string; text: string; children: MindNode[] };
 type MindWork = { root: MindNode };
@@ -306,64 +307,219 @@ const dropNode = (n: MindNode, id: string): MindNode => ({
   children: n.children.filter((c) => c.id !== id).map((c) => dropNode(c, id)),
 });
 
-const Branch: React.FC<{
-  node: MindNode;
-  depth: number;
-  onChange: (id: string, fn: (n: MindNode) => MindNode) => void;
-  onDelete: (id: string) => void;
-}> = ({ node, depth, onChange, onDelete }) => (
-  <div className="flex flex-col gap-1.5" style={{ marginLeft: depth === 0 ? 0 : 16 }}>
-    <div className="flex items-center gap-1.5">
-      <span
-        className="h-1.5 w-1.5 shrink-0 rounded-full"
-        style={{ backgroundColor: `rgb(var(--color-fg) / ${depth === 0 ? 0.8 : 0.35})` }}
-      />
-      <input
-        value={node.text}
-        onChange={(e) => onChange(node.id, (n) => ({ ...n, text: e.target.value }))}
-        placeholder={depth === 0 ? 'Idée centrale' : 'Branche'}
-        className={`flex-1 bg-transparent outline-none ${
-          depth === 0 ? 'text-sm font-semibold text-primary' : 'text-sm text-primary'
-        }`}
-      />
-      {depth < 4 && (
-        <IconBtn
-          label="Ajouter une branche"
-          onClick={() =>
-            onChange(node.id, (n) => ({
-              ...n,
-              children: [...n.children, { id: uid(), text: '', children: [] }],
-            }))
-          }
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </IconBtn>
-      )}
-      {depth > 0 && (
-        <IconBtn label="Supprimer" onClick={() => onDelete(node.id)}>
-          <X className="h-3.5 w-3.5" />
-        </IconBtn>
-      )}
-    </div>
-    {node.children.map((c) => (
-      <Branch key={c.id} node={c} depth={depth + 1} onChange={onChange} onDelete={onDelete} />
-    ))}
-  </div>
-);
+const BRANCH_COLORS = [
+  '#6366f1',
+  '#ec4899',
+  '#14b8a6',
+  '#f59e0b',
+  '#8b5cf6',
+  '#ef4444',
+  '#0ea5e9',
+  '#84cc16',
+];
 
-const MindMapWorkspace: React.FC<{ workKey: string; subject: string }> = ({ workKey, subject }) => {
+type Placed = {
+  node: MindNode;
+  x: number;
+  y: number;
+  depth: number;
+  color: string;
+  px: number;
+  py: number;
+};
+
+// Rayon cumulé par niveau (anneaux qui se resserrent).
+const RINGS = [0, 175, 150, 128, 112];
+
+function placeTree(
+  node: MindNode,
+  angle: number,
+  spread: number,
+  depth: number,
+  color: string,
+  px: number,
+  py: number,
+  out: Placed[],
+) {
+  const r = RINGS.slice(0, depth + 1).reduce((s, v) => s + v, 0);
+  const x = depth === 0 ? 0 : Math.cos(angle) * r;
+  const y = depth === 0 ? 0 : Math.sin(angle) * r;
+  out.push({ node, x, y, depth, color, px, py });
+
+  const n = node.children.length;
+  if (n === 0) return;
+
+  if (depth === 0) {
+    // Niveau 1 : réparti tout autour du centre, une couleur par branche.
+    // Décalage d'un demi-pas quand n est pair → 2 branches = gauche/droite, etc.
+    const start = -Math.PI / 2 + (n % 2 === 0 ? Math.PI / n : 0);
+    for (let i = 0; i < n; i++) {
+      const a = start + (i / n) * Math.PI * 2;
+      placeTree(
+        node.children[i],
+        a,
+        ((Math.PI * 2) / n) * 0.85,
+        1,
+        BRANCH_COLORS[i % BRANCH_COLORS.length],
+        x,
+        y,
+        out,
+      );
+    }
+  } else {
+    const childSpread = spread * 0.55;
+    for (let i = 0; i < n; i++) {
+      const a = n === 1 ? angle : angle - spread / 2 + (spread * (i + 0.5)) / n;
+      placeTree(node.children[i], a, childSpread, depth + 1, color, x, y, out);
+    }
+  }
+}
+
+const MindMapWorkspace: React.FC<{ workKey: string; subject: string; fill?: boolean }> = ({
+  workKey,
+  subject,
+  fill = false,
+}) => {
   const [d, set] = useWork<MindWork>(workKey, 'mindmap', {
     root: { id: 'root', text: subject || 'Idée centrale', children: [] },
   });
+  const [sel, setSel] = useState<string | null>(null);
+
+  const change = (id: string, fn: (n: MindNode) => MindNode) =>
+    set((p) => ({ root: updateNode(p.root, id, fn) }));
+  const addChild = (id: string) => {
+    const nid = uid();
+    change(id, (n) => ({
+      ...n,
+      children: [...n.children, { id: nid, text: '', children: [] }],
+    }));
+    setSel(nid);
+  };
+  const remove = (id: string) => {
+    set((p) => ({ root: dropNode(p.root, id) }));
+    setSel(null);
+  };
+
+  const placed: Placed[] = [];
+  placeTree(d.root, 0, Math.PI * 2, 0, 'rgb(var(--color-fg))', 0, 0, placed);
+
+  const PAD = 150;
+  const xs = placed.map((p) => p.x);
+  const ys = placed.map((p) => p.y);
+  const minX = Math.min(0, ...xs);
+  const maxX = Math.max(0, ...xs);
+  const minY = Math.min(0, ...ys);
+  const maxY = Math.max(0, ...ys);
+  const W = maxX - minX + PAD * 2;
+  const H = maxY - minY + PAD * 2;
+  const ox = PAD - minX;
+  const oy = PAD - minY;
+
   return (
-    <div>
-      <SectionLabel>Carte mentale</SectionLabel>
-      <Branch
-        node={d.root}
-        depth={0}
-        onChange={(id, fn) => set((p) => ({ root: updateNode(p.root, id, fn) }))}
-        onDelete={(id) => set((p) => ({ root: dropNode(p.root, id) }))}
-      />
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <PaneHead icon={<Share2 className="h-3.5 w-3.5" />}>Carte mentale</PaneHead>
+        <span className="text-[11px] text-muted-soft">
+          Clique une bulle → « + » pour une branche
+        </span>
+      </div>
+      <div
+        className={`flex overflow-auto rounded-xl border ${fill ? 'min-h-0 flex-1' : 'h-[440px]'}`}
+        style={{
+          borderColor: 'rgb(var(--color-fg) / 0.12)',
+          backgroundColor: 'rgb(var(--color-fg) / 0.02)',
+        }}
+        onClick={() => setSel(null)}
+      >
+        <div className="relative m-auto" style={{ width: W, height: H }}>
+          <svg className="absolute inset-0" width={W} height={H}>
+            {placed
+              .filter((p) => p.depth > 0)
+              .map((p) => (
+                <line
+                  key={p.node.id}
+                  x1={ox + p.px}
+                  y1={oy + p.py}
+                  x2={ox + p.x}
+                  y2={oy + p.y}
+                  stroke={p.color}
+                  strokeWidth={p.depth === 1 ? 2.5 : 1.75}
+                  strokeOpacity={0.45}
+                  strokeLinecap="round"
+                />
+              ))}
+          </svg>
+          {placed.map((p) => {
+            const isRoot = p.depth === 0;
+            const selected = sel === p.node.id;
+            return (
+              <div
+                key={p.node.id}
+                className="absolute flex items-center gap-1"
+                style={{
+                  left: ox + p.x,
+                  top: oy + p.y,
+                  transform: 'translate(-50%,-50%)',
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSel(p.node.id);
+                }}
+              >
+                <input
+                  value={p.node.text}
+                  onChange={(e) => change(p.node.id, (n) => ({ ...n, text: e.target.value }))}
+                  onFocus={() => setSel(p.node.id)}
+                  placeholder={isRoot ? 'Idée centrale' : 'Branche'}
+                  size={Math.max(isRoot ? 8 : 5, Math.min(24, p.node.text.length + 1))}
+                  className="rounded-full border px-3 py-1.5 text-center text-sm shadow-sm outline-none focus:ring-2 focus:ring-black/10"
+                  style={{
+                    backgroundColor: isRoot ? 'rgb(var(--color-fg))' : 'rgb(var(--color-surface))',
+                    color: isRoot ? 'rgb(var(--color-bg))' : 'rgb(var(--color-fg))',
+                    borderColor: isRoot ? 'transparent' : `${p.color}66`,
+                    fontWeight: isRoot ? 700 : 500,
+                  }}
+                />
+                {selected && (
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    {p.depth < 4 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addChild(p.node.id);
+                        }}
+                        aria-label="Ajouter une branche"
+                        className="flex h-6 w-6 items-center justify-center rounded-full shadow"
+                        style={{
+                          backgroundColor: p.color,
+                          color: isRoot ? 'rgb(var(--color-bg))' : '#ffffff',
+                        }}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {!isRoot && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          remove(p.node.id);
+                        }}
+                        aria-label="Supprimer"
+                        className="flex h-6 w-6 items-center justify-center rounded-full text-muted shadow transition-colors hover:text-primary"
+                        style={{ backgroundColor: 'rgb(var(--color-surface))' }}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 };
@@ -1027,7 +1183,7 @@ export const MethodWorkspace: React.FC<{
     case 'discussion':
       return <GroupWorkspace workKey={workKey} />;
     case 'mindmap':
-      return <MindMapWorkspace workKey={workKey} subject={subject} />;
+      return <MindMapWorkspace workKey={workKey} subject={subject} fill={fill} />;
     case 'podcast':
       return <AudioWorkspace workKey={workKey} />;
     case 'lecture_active':

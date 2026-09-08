@@ -278,9 +278,10 @@ const LearningSelectionCard: React.FC<{
   // Keep method order stable (as declared in METHODS) so the stacked workspaces
   // don't jump around when toggled.
   const orderedMethods = METHODS.filter((m) => methods.includes(m.value)).map((m) => m.value);
-  // Les méthodes « larges » (2 colonnes) : exercices (énoncé / corrigé), vidéos (résultats / lecteur).
-  const isWide = (m: string) => m === 'exercices' || m === 'vidéos';
-  // Carte plein écran dès qu'une méthode large est sélectionnée (seule ou combinée).
+  // Méthodes qui ont besoin de la carte plein écran : exercices (énoncé / corrigé),
+  // vidéos (résultats / lecteur), mindmap (canevas radial).
+  const isWide = (m: string) => m === 'exercices' || m === 'vidéos' || m === 'mindmap';
+  // Carte plein écran dès qu'une de ces méthodes est sélectionnée (seule ou combinée).
   const bigMode = !setup && orderedMethods.some(isWide);
   const soloWide = bigMode && orderedMethods.length === 1;
 
