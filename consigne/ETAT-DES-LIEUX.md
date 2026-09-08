@@ -1,6 +1,6 @@
 # reiim — état des lieux
 
-_Dernière mise à jour : 2026-09-09 (« Vidéos explicatives » fait + testé ; prochaine méthode = Flashcards)._
+_Dernière mise à jour : 2026-09-09 (méthodes « Vidéos » + « Cartes mentales » faites ; reste Lecture&notes / Flashcards / Simulations)._
 _Ce fichier sert de mémoire entre les sessions. Le lire en premier à la reprise._
 
 ## Projet Supabase (réel, en place)
@@ -80,7 +80,7 @@ indexés par jour × slot méthode.
 | **Exercices pratiques** (`exercices`) | **Assistant IA qui FAIT le devoir**. Si c'est la seule méthode → carte **plein écran** en 2 colonnes : à gauche l'**énoncé** (upload d'un **PDF** visualisé + zone texte), à droite le **corrigé** rendu en Markdown + maths KaTeX, bouton **Copier**. Bouton « Faire le devoir » / « Refaire ». Le PDF est envoyé tel quel à Claude (document block). Décompte des crédits. PDF gardé en mémoire (pas persisté — voir backlog). |
 | Projets concrets (`projets`) | Checklist d'étapes + barre de progression |
 | Étude en groupe (`discussion`) | Quand / Où, participants (chips), points à aborder |
-| Cartes mentales (`mindmap`) | Arbre d'idées (5 niveaux) |
+| Cartes mentales (`mindmap`) | **Carte radiale visuelle** : nœud central + branches qui rayonnent, connecteurs colorés, édition inline, +/− branche, plein écran |
 | Podcasts & audio (`podcast`) | Liste de ressources (titre, lien, note, coché) |
 | Lecture active & synthèse (`lecture_active`) | Idées clés / Questions / synthèse |
 | Vidéos, Lecture & notes, Flashcards, Simulations & labos | Encadré « Méthode de révision » (rien à préparer) |
@@ -122,10 +122,15 @@ Claude**, l'utilisateur met 5 € de crédit sur la console Anthropic.
   quand `vidéos` est la seule méthode.
 - Testé : recherche « dérivée d'une fonction » → 15 vidéos, Yvan Monka en tête, lecteur OK.
 
-⏭️ **Méthodes restantes sans espace** (le `StudyReminder` s'affiche encore pour elles) :
+✅ **« Cartes mentales » — FAIT (2026-09-09).** `MindMapWorkspace` réécrit : carte radiale
+visuelle (SVG connecteurs + bulles `<input>` positionnées, layout radial auto `placeTree`),
+une couleur par branche niveau 1, sélection → boutons +/×, profondeur max 4, plein écran
+(bigMode). Données `MindNode`/`MindWork` inchangées.
+
+⏭️ **Méthodes restantes sans espace** (le `StudyReminder` s'affiche encore) :
 **Lecture & notes**, **Flashcards & mémorisation**, **Simulations & labos**.
-Prochaine à coder : **Flashcards & mémorisation** (deck de cartes recto/verso + mode révision
-Leitner ; autonome, sans API ni crédit ; option « générer des cartes » via l'IA en backlog).
+Prochaine suggérée : **Flashcards & mémorisation** (deck recto/verso + révision Leitner ;
+autonome, sans API ni crédit ; « générer des cartes » via l'IA en backlog).
 
 Redonner des crédits IA pendant les tests (SQL Editor) :
 `update public.profiles set credits = 100 where email = 'kelian.luye@gmail.com';`
