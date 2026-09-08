@@ -1,8 +1,23 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, Copy, FileText, FileUp, PenLine, Plus, Sparkles, X } from 'lucide-react';
+import {
+  Bookmark,
+  BookmarkCheck,
+  Check,
+  Copy,
+  ExternalLink,
+  FileText,
+  FileUp,
+  PenLine,
+  Play,
+  Plus,
+  Search,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import { useWork } from '@/lib/devoir-work';
 import { useAuth } from '@/lib/auth';
 import { askAI, AIError } from '@/lib/ai';
+import { searchVideos, VideoError, type Video } from '@/lib/videos';
 import { Loader } from '@/components/ui/loader';
 
 // Chargé à la demande : react-markdown + KaTeX pèsent ~400 Ko, inutiles tant
@@ -723,10 +738,259 @@ const ExerciseWorkspace: React.FC<{ workKey: string; subject: string; fill?: boo
   );
 };
 
+/* ---------- Vidéos explicatives : recherche YouTube + lecteur intégré ---------- */
+
+type Pin = Video & { watched: boolean; notes: string };
+type VideoWork = {
+  query: string;
+  results: Video[];
+  currentId: string | null;
+  pins: Pin[];
+};
+
+const ResultCard: React.FC<{
+  v: Video;
+  pinned: boolean;
+  onPlay: () => void;
+  onPin: () => void;
+}> = ({ v, pinned, onPlay, onPin }) => (
+  <div
+    className="flex gap-2.5 rounded-lg border p-2 transition-colors"
+    style={{ borderColor: 'rgb(var(--color-fg) / 0.1)' }}
+  >
+    <button
+      type="button"
+      onClick={onPlay}
+      className="relative aspect-video w-28 shrink-0 overflow-hidden rounded-md"
+      style={{ backgroundColor: 'rgb(var(--color-fg) / 0.08)' }}
+    >
+      {v.thumb && <img src={v.thumb} alt="" className="h-full w-full object-cover" />}
+      <span className="absolute inset-0 flex items-center justify-center bg-black/25 opacity-0 transition-opacity hover:opacity-100">
+        <Play className="h-6 w-6 fill-white text-white" />
+      </span>
+      {v.duration && (
+        <span className="absolute bottom-0.5 right-0.5 rounded bg-black/75 px-1 text-[10px] font-medium text-white">
+          {v.duration}
+        </span>
+      )}
+    </button>
+    <div className="flex min-w-0 flex-1 flex-col">
+      <button type="button" onClick={onPlay} className="text-left">
+        <p className="line-clamp-2 text-xs font-medium text-primary">{v.title}</p>
+      </button>
+      <p className="mt-0.5 truncate text-[11px] text-muted">{v.channel}</p>
+      <div className="mt-auto flex items-center gap-2 pt-1">
+        <button
+          type="button"
+          onClick={onPin}
+          className="flex items-center gap-1 text-[11px] text-muted transition-colors hover:text-primary"
+        >
+          {pinned ? (
+            <BookmarkCheck className="h-3.5 w-3.5" />
+          ) : (
+            <Bookmark className="h-3.5 w-3.5" />
+          )}
+          {pinned ? 'Ajoutée' : 'Ajouter'}
+        </button>
+        <a
+          href={`https://www.youtube.com/watch?v=${v.id}`}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-1 text-[11px] text-muted transition-colors hover:text-primary"
+        >
+          <ExternalLink className="h-3 w-3" />
+          YouTube
+        </a>
+      </div>
+    </div>
+  </div>
+);
+
+const VideoWorkspace: React.FC<{ workKey: string; subject: string; fill?: boolean }> = ({
+  workKey,
+  subject,
+  fill = false,
+}) => {
+  const [d, set] = useWork<VideoWork>(workKey, 'vidéos', {
+    query: '',
+    results: [],
+    currentId: null,
+    pins: [],
+  });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const run = async () => {
+    if (busy || !d.query.trim()) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const results = await searchVideos(d.query, subject);
+      set((p) => ({ ...p, results }));
+    } catch (e) {
+      setErr(e instanceof VideoError ? e.message : 'Une erreur est survenue.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const isPinned = (id: string) => d.pins.some((p) => p.id === id);
+  const togglePin = (v: Video) =>
+    set((p) => ({
+      ...p,
+      pins: isPinned(v.id)
+        ? p.pins.filter((x) => x.id !== v.id)
+        : [...p.pins, { ...v, watched: false, notes: '' }],
+    }));
+  const patchPin = (id: string, patch: Partial<Pin>) =>
+    set((p) => ({ ...p, pins: p.pins.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
+
+  const current =
+    d.results.find((v) => v.id === d.currentId) ??
+    d.pins.find((v) => v.id === d.currentId) ??
+    null;
+
+  const grow = fill ? 'min-h-0 flex-1' : '';
+
+  const recherche = (
+    <div className="flex min-h-0 flex-col gap-2.5">
+      <PaneHead icon={<Search className="h-3.5 w-3.5" />}>Recherche</PaneHead>
+      <div className="flex gap-2">
+        <input
+          value={d.query}
+          onChange={(e) => set((p) => ({ ...p, query: e.target.value }))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void run();
+          }}
+          placeholder="Chapitre ou notion — ex. théorème de Pythagore"
+          className={inputCls}
+          style={inputStyle}
+        />
+        <button
+          type="button"
+          onClick={run}
+          disabled={busy || !d.query.trim()}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg px-4 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
+          style={{ backgroundColor: 'rgb(var(--color-fg))', color: 'rgb(var(--color-bg))' }}
+        >
+          {busy ? <Loader variant="dots" size={16} /> : <Search className="h-4 w-4" />}
+        </button>
+      </div>
+      <p className="text-[11px] text-muted-soft">Matière : {subject}</p>
+      {err && (
+        <p className="text-xs" style={{ color: 'rgb(239 68 68)' }}>
+          {err}
+        </p>
+      )}
+      <div className={`flex flex-col gap-2 overflow-y-auto ${fill ? grow : 'max-h-[360px]'}`}>
+        {d.results.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted">
+            {busy ? 'Recherche…' : 'Cherche un chapitre pour voir des vidéos.'}
+          </p>
+        ) : (
+          d.results.map((v) => (
+            <ResultCard
+              key={v.id}
+              v={v}
+              pinned={isPinned(v.id)}
+              onPlay={() => set((p) => ({ ...p, currentId: v.id }))}
+              onPin={() => togglePin(v)}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+
+  const lecteur = (
+    <div
+      className={`flex min-h-0 flex-col gap-2.5 ${fill ? 'lg:border-l lg:pl-6' : ''}`}
+      style={fill ? { borderColor: 'rgb(var(--color-fg) / 0.08)' } : undefined}
+    >
+      <PaneHead icon={<Play className="h-3.5 w-3.5" />}>Lecteur</PaneHead>
+      <div
+        className="aspect-video w-full shrink-0 overflow-hidden rounded-xl border shadow-sm"
+        style={{
+          borderColor: 'rgb(var(--color-fg) / 0.1)',
+          backgroundColor: 'rgb(var(--color-fg) / 0.04)',
+        }}
+      >
+        {current ? (
+          <iframe
+            key={current.id}
+            src={`https://www.youtube-nocookie.com/embed/${current.id}`}
+            title={current.title}
+            className="h-full w-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center text-sm text-muted">
+            Choisis une vidéo à gauche.
+          </div>
+        )}
+      </div>
+      {current && <p className="shrink-0 text-xs font-medium text-primary">{current.title}</p>}
+
+      <PaneHead icon={<Bookmark className="h-3.5 w-3.5" />}>
+        Mes vidéos ({d.pins.filter((p) => p.watched).length}/{d.pins.length})
+      </PaneHead>
+      <div className={`flex flex-col gap-2 overflow-y-auto ${fill ? grow : 'max-h-[240px]'}`}>
+        {d.pins.length === 0 ? (
+          <p className="text-xs text-muted-soft">
+            Ajoute des vidéos depuis les résultats pour les suivre ici.
+          </p>
+        ) : (
+          d.pins.map((p) => (
+            <div
+              key={p.id}
+              className="rounded-lg border p-2"
+              style={{ borderColor: 'rgb(var(--color-fg) / 0.1)' }}
+            >
+              <div className="flex items-center gap-2">
+                <CheckBox
+                  on={p.watched}
+                  onClick={() => patchPin(p.id, { watched: !p.watched })}
+                />
+                <button
+                  type="button"
+                  onClick={() => set((prev) => ({ ...prev, currentId: p.id }))}
+                  className={`flex-1 truncate text-left text-xs ${
+                    p.watched ? 'text-muted line-through' : 'text-primary'
+                  }`}
+                >
+                  {p.title}
+                </button>
+                <IconBtn label="Retirer" onClick={() => togglePin(p)}>
+                  <X className="h-3.5 w-3.5" />
+                </IconBtn>
+              </div>
+              <input
+                value={p.notes}
+                onChange={(e) => patchPin(p.id, { notes: e.target.value })}
+                placeholder="Note (ce que la vidéo t'apprend…)"
+                className="mt-1.5 w-full bg-transparent text-xs text-primary outline-none"
+              />
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div
+      className={`grid gap-6 ${fill ? 'min-h-0 flex-1 lg:grid-cols-[1fr_1.2fr]' : 'lg:grid-cols-2'}`}
+    >
+      {recherche}
+      {lecteur}
+    </div>
+  );
+};
+
 /* ---------- Révision (méthodes sans espace de travail) ---------- */
 
 const METHOD_HINTS: Record<string, string> = {
-  vidéos: 'Regarde des vidéos explicatives sur le sujet le jour prévu.',
   lecture: 'Lis le cours et prends des notes le jour prévu.',
   flashcards: 'Révise avec des flashcards / répétition espacée le jour prévu.',
   simulation: 'Fais la simulation ou le TP en laboratoire le jour prévu.',
@@ -756,6 +1020,8 @@ export const MethodWorkspace: React.FC<{
   switch (method) {
     case 'exercices':
       return <ExerciseWorkspace workKey={workKey} subject={subject} fill={fill} />;
+    case 'vidéos':
+      return <VideoWorkspace workKey={workKey} subject={subject} fill={fill} />;
     case 'projets':
       return <ProjectWorkspace workKey={workKey} />;
     case 'discussion':

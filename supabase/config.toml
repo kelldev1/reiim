@@ -4,3 +4,6 @@ project_id = "reiim"
 
 [functions.ai]
 verify_jwt = true
+
+[functions.videos]
+verify_jwt = true

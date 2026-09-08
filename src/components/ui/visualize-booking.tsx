@@ -278,8 +278,12 @@ const LearningSelectionCard: React.FC<{
   // Keep method order stable (as declared in METHODS) so the stacked workspaces
   // don't jump around when toggled.
   const orderedMethods = METHODS.filter((m) => methods.includes(m.value)).map((m) => m.value);
-  // Mode plein écran : « Exercices pratiques » seul → énoncé PDF à gauche, corrigé à droite.
-  const bigMode = !setup && orderedMethods.length === 1 && orderedMethods[0] === 'exercices';
+  // Mode plein écran pour les méthodes à 2 colonnes (exercices : énoncé / corrigé,
+  // vidéos : résultats / lecteur), quand c'est la seule méthode du devoir.
+  const bigMode =
+    !setup &&
+    orderedMethods.length === 1 &&
+    (orderedMethods[0] === 'exercices' || orderedMethods[0] === 'vidéos');
 
   const toggleMethod = (value: string) => {
     setMethods((prev) => (prev.includes(value) ? prev.filter((x) => x !== value) : [...prev, value]));
@@ -347,8 +351,11 @@ const LearningSelectionCard: React.FC<{
                     {subMeta?.label ?? subject}
                   </h3>
                 </div>
-                <p className="mt-1 text-xs capitalize text-muted">
-                  Exercices pratiques · {day} {monthLabel}
+                <p className="mt-1 text-xs text-muted">
+                  {METHODS.find((x) => x.value === orderedMethods[0])?.label} ·{' '}
+                  <span className="capitalize">
+                    {day} {monthLabel}
+                  </span>
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1.5 pr-7">
