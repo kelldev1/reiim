@@ -68,7 +68,8 @@ Deno.serve(async (req: Request) => {
 
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
   const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
-  const YT_API_KEY = Deno.env.get('YT_API_KEY');
+  // .trim() : un espace / retour-ligne collé avec la clé la rend invalide.
+  const YT_API_KEY = (Deno.env.get('YT_API_KEY') ?? '').trim();
   if (!SUPABASE_URL || !ANON_KEY || !YT_API_KEY) {
     return json({ error: 'server-misconfigured' }, 500);
   }
@@ -114,11 +115,15 @@ Deno.serve(async (req: Request) => {
 
     if (!searchRes.ok) {
       const reason = searchData?.error?.errors?.[0]?.reason ?? '';
+      const message = searchData?.error?.message ?? '';
       if (reason === 'quotaExceeded' || reason === 'dailyLimitExceeded') {
         return json({ error: 'quota' }, 429);
       }
-      console.error('yt-search-error', searchRes.status, JSON.stringify(searchData?.error));
-      return json({ error: 'yt-failed', status: searchRes.status }, 502);
+      console.error('yt-search-error', searchRes.status, reason, message);
+      return json(
+        { error: 'yt-failed', status: searchRes.status, reason, detail: String(message).slice(0, 300) },
+        502,
+      );
     }
 
     const items: any[] = Array.isArray(searchData?.items) ? searchData.items : [];
