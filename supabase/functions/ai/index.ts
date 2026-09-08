@@ -44,6 +44,38 @@ PRÉSENTATION :
 - Rédaction (dissertation, commentaire, essai) : rends le texte fini et structuré (introduction, développement, conclusion), pas un plan.
 - Énoncé ambigu ou incomplet : prends l'hypothèse la plus raisonnable, signale-la en une ligne au début, puis fais le devoir.`;
 
+// Prompts spécifiques à certaines méthodes.
+const SYSTEM_MINDMAP = `Tu construis une CARTE MENTALE de révision pour un élève (collège / lycée, France) sur le sujet donné.
+
+Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, sans balises \`\`\`. Forme :
+{"text":"<sujet, 1-4 mots>","children":[{"text":"<branche>","children":[{"text":"<sous-idée>","children":[]}]}]}
+
+Règles :
+- 4 à 6 branches principales couvrant l'essentiel du chapitre.
+- 2 à 4 sous-idées par branche ; un 3e niveau seulement si vraiment utile (max profondeur 4).
+- Texte de chaque nœud : 5 mots MAXIMUM, style prise de notes (mots-clés, dates, noms, formules). Jamais de phrase, pas de ponctuation de fin.
+
+EXACTITUDE (impératif) :
+- Chaque date, nom propre, chiffre, définition doit être EXACT et vérifiable dans un manuel scolaire.
+- En cas de doute sur une précision (une date exacte, un nom), reste général plutôt que d'inventer.
+- Pas d'approximation ni d'anachronisme. Relis mentalement chaque fait avant de le mettre.
+- Français, niveau et programme de l'élève.`;
+
+const SYSTEMS: Record<
+  string,
+  { system: string; maxTokens: number; effort: string; free?: boolean; model?: string }
+> = {
+  // Génération de carte mentale = gratuite. Sonnet 5 + effort medium : assez fiable
+  // pour du contenu scolaire, moins cher qu'Opus pour une fonctionnalité offerte.
+  mindmap: {
+    system: SYSTEM_MINDMAP,
+    model: 'claude-sonnet-5',
+    maxTokens: 1600,
+    effort: 'medium',
+    free: true,
+  },
+};
+
 const cors: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -92,7 +124,8 @@ Deno.serve(async (req: Request) => {
   const feature = String(body.feature ?? 'exercices').slice(0, 40);
   // PDF de l'énoncé, encodé base64 (sans le préfixe data:).
   const pdf = typeof body.pdf === 'string' ? body.pdf : '';
-  if (!prompt && !pdf) return json({ error: 'empty-prompt' }, 400);
+  const mode = SYSTEMS[feature];
+  if (!prompt && !pdf && !mode) return json({ error: 'empty-prompt' }, 400);
   if (prompt.length > 8000) return json({ error: 'prompt-too-long' }, 400);
   if (pdf.length > 9_000_000) return json({ error: 'pdf-too-large' }, 400);
 
@@ -107,20 +140,27 @@ Deno.serve(async (req: Request) => {
     .gte('created_at', since);
   if ((count ?? 0) > 0) return json({ error: 'rate-limit' }, 429);
 
-  // 3. spend a credit (atomic; -1 means the user has none)
-  const { data: remaining, error: deductErr } = await admin.rpc('deduct_ai_credit', {
-    p_user: user.id,
-  });
-  if (deductErr) return json({ error: 'server' }, 500);
-  if (remaining === -1) return json({ error: 'no-credits' }, 402);
+  // 3. dépense 1 crédit — sauf pour les modes gratuits (ex. carte mentale).
+  let remaining = -1;
+  if (!mode?.free) {
+    const { data, error: deductErr } = await admin.rpc('deduct_ai_credit', {
+      p_user: user.id,
+    });
+    if (deductErr) return json({ error: 'server' }, 500);
+    if (data === -1) return json({ error: 'no-credits' }, 402);
+    remaining = data as number;
+  }
+  const refund = () => (mode?.free ? Promise.resolve() : admin.rpc('refund_ai_credit', { p_user: user.id }));
 
   const intro = subject ? `Matière : ${subject}\n\n` : '';
-  const text = pdf
-    ? `${intro}${prompt || "Fais le devoir de l'énoncé joint (PDF), en entier."}`
-    : `${intro}Énoncé / devoir :\n${prompt}`;
+  const text = mode
+    ? `${intro}Sujet de la carte : ${prompt || subject || 'le chapitre en cours'}`
+    : pdf
+      ? `${intro}${prompt || "Fais le devoir de l'énoncé joint (PDF), en entier."}`
+      : `${intro}Énoncé / devoir :\n${prompt}`;
 
   const userContent: any[] = [];
-  if (pdf) {
+  if (pdf && !mode) {
     userContent.push({
       type: 'document',
       source: { type: 'base64', media_type: 'application/pdf', data: pdf },
@@ -132,15 +172,15 @@ Deno.serve(async (req: Request) => {
 
   try {
     const msg: any = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      system: SYSTEM,
-      output_config: { effort: EFFORT },
+      model: mode?.model ?? MODEL,
+      max_tokens: mode?.maxTokens ?? MAX_TOKENS,
+      system: mode?.system ?? SYSTEM,
+      output_config: { effort: mode?.effort ?? EFFORT },
       messages: [{ role: 'user', content: userContent }],
     } as any);
 
     if (msg.stop_reason === 'refusal') {
-      await admin.rpc('refund_ai_credit', { p_user: user.id });
+      await refund();
       const cat = msg.stop_details?.category ?? 'refusal';
       return json({ error: 'refused', detail: String(cat) }, 422);
     }
@@ -152,14 +192,14 @@ Deno.serve(async (req: Request) => {
       .trim();
 
     if (!answer) {
-      await admin.rpc('refund_ai_credit', { p_user: user.id });
+      await refund();
       return json({ error: 'refused', detail: msg.stop_reason ?? 'empty-response' }, 422);
     }
 
     await admin.from('ai_usage').insert({
       user_id: user.id,
       feature,
-      model: MODEL,
+      model: mode?.model ?? MODEL,
       input_tokens: msg.usage?.input_tokens ?? null,
       output_tokens: msg.usage?.output_tokens ?? null,
       cached_input_tokens: msg.usage?.cache_read_input_tokens ?? 0,
@@ -167,7 +207,7 @@ Deno.serve(async (req: Request) => {
 
     return json({ answer, creditsLeft: remaining });
   } catch (err) {
-    await admin.rpc('refund_ai_credit', { p_user: user.id });
+    await refund();
 
     if (err instanceof Anthropic.APIError) {
       const status = err.status ?? null;

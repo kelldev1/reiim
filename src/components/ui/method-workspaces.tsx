@@ -297,7 +297,7 @@ const GroupWorkspace: React.FC<{ workKey: string }> = ({ workKey }) => {
 /* ---------- Cartes mentales : carte radiale ---------- */
 
 type MindNode = { id: string; text: string; children: MindNode[] };
-type MindWork = { root: MindNode };
+type MindWork = { root: MindNode; topic?: string };
 
 const updateNode = (n: MindNode, id: string, fn: (x: MindNode) => MindNode): MindNode =>
   n.id === id ? fn(n) : { ...n, children: n.children.map((c) => updateNode(c, id, fn)) };
@@ -328,8 +328,8 @@ type Placed = {
   py: number;
 };
 
-// Rayon cumulé par niveau (anneaux qui se resserrent).
-const RINGS = [0, 175, 150, 128, 112];
+// Rayon cumulé par niveau.
+const RINGS = [0, 230, 250, 180, 150];
 
 function placeTree(
   node: MindNode,
@@ -358,7 +358,7 @@ function placeTree(
       placeTree(
         node.children[i],
         a,
-        ((Math.PI * 2) / n) * 0.85,
+        ((Math.PI * 2) / n) * 0.92,
         1,
         BRANCH_COLORS[i % BRANCH_COLORS.length],
         x,
@@ -367,13 +367,65 @@ function placeTree(
       );
     }
   } else {
-    const childSpread = spread * 0.55;
+    const childSpread = spread * 0.82;
     for (let i = 0; i < n; i++) {
-      const a = n === 1 ? angle : angle - spread / 2 + (spread * (i + 0.5)) / n;
+      const a = n === 1 ? angle : angle - childSpread / 2 + (childSpread * (i + 0.5)) / n;
       placeTree(node.children[i], a, childSpread, depth + 1, color, x, y, out);
     }
   }
 }
+
+/** Bulle de carte mentale : textarea qui s'adapte en hauteur au texte (retour à la ligne). */
+const MindBubble: React.FC<{
+  value: string;
+  placeholder: string;
+  onChange: (v: string) => void;
+  onFocus: () => void;
+  style: React.CSSProperties;
+}> = ({ value, placeholder, onChange, onFocus, style }) => {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = '0px';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value, style.width]);
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      onFocus={onFocus}
+      onClick={(e) => e.stopPropagation()}
+      className="resize-none overflow-hidden rounded-2xl border-0 text-center leading-snug outline-none transition-shadow focus:ring-2 focus:ring-black/10"
+      style={style}
+    />
+  );
+};
+
+const clampTree = (j: any, depth = 0): MindNode => ({
+  id: depth === 0 ? 'root' : uid(),
+  text:
+    String(j?.text ?? j?.name ?? '')
+      .trim()
+      .slice(0, 60) || (depth === 0 ? 'Idée centrale' : 'Branche'),
+  children:
+    depth >= 4 || !Array.isArray(j?.children)
+      ? []
+      : j.children.slice(0, 6).map((c: any) => clampTree(c, depth + 1)),
+});
+
+const parseMindmap = (answer: string): MindNode => {
+  let s = answer.trim();
+  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) s = fence[1].trim();
+  const a = s.indexOf('{');
+  const b = s.lastIndexOf('}');
+  if (a >= 0 && b > a) s = s.slice(a, b + 1);
+  return clampTree(JSON.parse(s));
+};
 
 const MindMapWorkspace: React.FC<{ workKey: string; subject: string; fill?: boolean }> = ({
   workKey,
@@ -384,6 +436,25 @@ const MindMapWorkspace: React.FC<{ workKey: string; subject: string; fill?: bool
     root: { id: 'root', text: subject || 'Idée centrale', children: [] },
   });
   const [sel, setSel] = useState<string | null>(null);
+  const topic = d.topic ?? '';
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  const generate = async () => {
+    if (busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const { answer } = await askAI({ feature: 'mindmap', subject, prompt: topic });
+      set((p) => ({ ...p, root: parseMindmap(answer) }));
+      setSel(null);
+    } catch (e) {
+      setErr(e instanceof AIError ? e.message : "La carte n'a pas pu être générée.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const change = (id: string, fn: (n: MindNode) => MindNode) =>
     set((p) => ({ root: updateNode(p.root, id, fn) }));
@@ -403,7 +474,7 @@ const MindMapWorkspace: React.FC<{ workKey: string; subject: string; fill?: bool
   const placed: Placed[] = [];
   placeTree(d.root, 0, Math.PI * 2, 0, 'rgb(var(--color-fg))', 0, 0, placed);
 
-  const PAD = 150;
+  const PAD = 190;
   const xs = placed.map((p) => p.x);
   const ys = placed.map((p) => p.y);
   const minX = Math.min(0, ...xs);
@@ -415,39 +486,130 @@ const MindMapWorkspace: React.FC<{ workKey: string; subject: string; fill?: bool
   const ox = PAD - minX;
   const oy = PAD - minY;
 
+  // Centre la vue sur la racine à l'ouverture et après chaque (re)génération.
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (c) {
+      c.scrollLeft = ox - c.clientWidth / 2;
+      c.scrollTop = oy - c.clientHeight / 2;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [W, H]);
+
+  const bubbleStyle = (p: Placed): React.CSSProperties => {
+    if (p.depth === 0)
+      return {
+        width: 176,
+        padding: '10px 16px',
+        fontSize: 15,
+        fontWeight: 700,
+        backgroundColor: 'rgb(var(--color-fg))',
+        color: 'rgb(var(--color-bg))',
+        boxShadow: '0 8px 24px rgb(0 0 0 / 0.22)',
+      };
+    if (p.depth === 1)
+      return {
+        width: 152,
+        padding: '8px 14px',
+        fontSize: 13.5,
+        fontWeight: 600,
+        backgroundColor: p.color,
+        color: '#ffffff',
+        boxShadow: `0 5px 16px ${p.color}59`,
+      };
+    return {
+      width: 148,
+      padding: '6px 12px',
+      fontSize: 12.5,
+      fontWeight: 500,
+      backgroundColor: 'rgb(var(--color-surface))',
+      color: 'rgb(var(--color-fg))',
+      border: `1.5px solid ${p.color}`,
+      boxShadow: '0 2px 10px rgb(0 0 0 / 0.09)',
+    };
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <PaneHead icon={<Share2 className="h-3.5 w-3.5" />}>Carte mentale</PaneHead>
-        <span className="text-[11px] text-muted-soft">
-          Clique une bulle → « + » pour une branche
-        </span>
+      <PaneHead icon={<Share2 className="h-3.5 w-3.5" />}>Carte mentale</PaneHead>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          value={topic}
+          onChange={(e) => set((p) => ({ ...p, topic: e.target.value }))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void generate();
+          }}
+          placeholder="Sujet de la carte (ex. la Révolution française)…"
+          className={`${inputCls} min-w-[12rem] flex-1`}
+          style={inputStyle}
+        />
+        <button
+          type="button"
+          onClick={generate}
+          disabled={busy}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
+          style={{ backgroundColor: 'rgb(var(--color-fg))', color: 'rgb(var(--color-bg))' }}
+        >
+          {busy ? <Loader variant="dots" size={16} /> : <Sparkles className="h-4 w-4" />}
+          {busy ? 'Génère…' : d.root.children.length ? 'Régénérer' : 'Générer'}
+        </button>
+        <span className="text-xs text-muted">gratuit</span>
       </div>
+      {err ? (
+        <p className="text-xs" style={{ color: 'rgb(239 68 68)' }}>
+          {err}
+        </p>
+      ) : (
+        <p className="text-[11px] text-muted-soft">
+          « Générer » crée une carte de départ (gratuit) — ensuite tu l'édites : clique une
+          bulle → « + » pour une branche, « × » pour supprimer.
+        </p>
+      )}
       <div
-        className={`flex overflow-auto rounded-xl border ${fill ? 'min-h-0 flex-1' : 'h-[440px]'}`}
+        ref={canvasRef}
+        className={`flex overflow-auto rounded-xl border ${fill ? 'min-h-0 flex-1' : 'h-[460px]'}`}
         style={{
           borderColor: 'rgb(var(--color-fg) / 0.12)',
-          backgroundColor: 'rgb(var(--color-fg) / 0.02)',
+          backgroundColor: 'rgb(var(--color-fg) / 0.015)',
         }}
         onClick={() => setSel(null)}
       >
-        <div className="relative m-auto" style={{ width: W, height: H }}>
+        <div
+          className="relative m-auto"
+          style={{
+            width: W,
+            height: H,
+            backgroundImage:
+              'radial-gradient(circle, rgb(var(--color-fg) / 0.07) 1px, transparent 1px)',
+            backgroundSize: '24px 24px',
+          }}
+        >
           <svg className="absolute inset-0" width={W} height={H}>
             {placed
               .filter((p) => p.depth > 0)
-              .map((p) => (
-                <line
-                  key={p.node.id}
-                  x1={ox + p.px}
-                  y1={oy + p.py}
-                  x2={ox + p.x}
-                  y2={oy + p.y}
-                  stroke={p.color}
-                  strokeWidth={p.depth === 1 ? 2.5 : 1.75}
-                  strokeOpacity={0.45}
-                  strokeLinecap="round"
-                />
-              ))}
+              .map((p) => {
+                const x1 = ox + p.px;
+                const y1 = oy + p.py;
+                const x2 = ox + p.x;
+                const y2 = oy + p.y;
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const dd =
+                  Math.abs(dx) > Math.abs(dy)
+                    ? `M ${x1} ${y1} C ${x1 + dx * 0.5} ${y1}, ${x1 + dx * 0.5} ${y2}, ${x2} ${y2}`
+                    : `M ${x1} ${y1} C ${x1} ${y1 + dy * 0.5}, ${x2} ${y1 + dy * 0.5}, ${x2} ${y2}`;
+                return (
+                  <path
+                    key={p.node.id}
+                    d={dd}
+                    fill="none"
+                    stroke={p.color}
+                    strokeWidth={p.depth === 1 ? 3 : p.depth === 2 ? 2 : 1.5}
+                    strokeOpacity={0.5}
+                    strokeLinecap="round"
+                  />
+                );
+              })}
           </svg>
           {placed.map((p) => {
             const isRoot = p.depth === 0;
@@ -455,66 +617,53 @@ const MindMapWorkspace: React.FC<{ workKey: string; subject: string; fill?: bool
             return (
               <div
                 key={p.node.id}
-                className="absolute flex items-center gap-1"
-                style={{
-                  left: ox + p.x,
-                  top: oy + p.y,
-                  transform: 'translate(-50%,-50%)',
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSel(p.node.id);
-                }}
+                className="absolute"
+                style={{ left: ox + p.x, top: oy + p.y, transform: 'translate(-50%,-50%)' }}
               >
-                <input
-                  value={p.node.text}
-                  onChange={(e) => change(p.node.id, (n) => ({ ...n, text: e.target.value }))}
-                  onFocus={() => setSel(p.node.id)}
-                  placeholder={isRoot ? 'Idée centrale' : 'Branche'}
-                  size={Math.max(isRoot ? 8 : 5, Math.min(24, p.node.text.length + 1))}
-                  className="rounded-full border px-3 py-1.5 text-center text-sm shadow-sm outline-none focus:ring-2 focus:ring-black/10"
-                  style={{
-                    backgroundColor: isRoot ? 'rgb(var(--color-fg))' : 'rgb(var(--color-surface))',
-                    color: isRoot ? 'rgb(var(--color-bg))' : 'rgb(var(--color-fg))',
-                    borderColor: isRoot ? 'transparent' : `${p.color}66`,
-                    fontWeight: isRoot ? 700 : 500,
-                  }}
-                />
-                {selected && (
-                  <div className="flex shrink-0 items-center gap-0.5">
-                    {p.depth < 4 && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          addChild(p.node.id);
-                        }}
-                        aria-label="Ajouter une branche"
-                        className="flex h-6 w-6 items-center justify-center rounded-full shadow"
-                        style={{
-                          backgroundColor: p.color,
-                          color: isRoot ? 'rgb(var(--color-bg))' : '#ffffff',
-                        }}
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                    {!isRoot && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          remove(p.node.id);
-                        }}
-                        aria-label="Supprimer"
-                        className="flex h-6 w-6 items-center justify-center rounded-full text-muted shadow transition-colors hover:text-primary"
-                        style={{ backgroundColor: 'rgb(var(--color-surface))' }}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                )}
+                <div className="relative">
+                  <MindBubble
+                    value={p.node.text}
+                    placeholder={isRoot ? 'Idée centrale' : 'branche'}
+                    onChange={(v) => change(p.node.id, (n) => ({ ...n, text: v }))}
+                    onFocus={() => setSel(p.node.id)}
+                    style={bubbleStyle(p)}
+                  />
+                  {selected && (
+                    <div className="absolute left-full top-1/2 ml-1 flex -translate-y-1/2 items-center gap-1">
+                      {p.depth < 4 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addChild(p.node.id);
+                          }}
+                          aria-label="Ajouter une branche"
+                          className="flex h-6 w-6 items-center justify-center rounded-full shadow-md"
+                          style={{
+                            backgroundColor: isRoot ? 'rgb(var(--color-fg))' : p.color,
+                            color: isRoot ? 'rgb(var(--color-bg))' : '#ffffff',
+                          }}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {!isRoot && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            remove(p.node.id);
+                          }}
+                          aria-label="Supprimer"
+                          className="flex h-6 w-6 items-center justify-center rounded-full text-muted shadow-md transition-colors hover:text-primary"
+                          style={{ backgroundColor: 'rgb(var(--color-surface))' }}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })}
