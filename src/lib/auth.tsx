@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase';
 export interface User {
   id: string;
   name: string;
+  /** Identifiant court aléatoire — l'identité publique est `name#tag`. */
+  tag: string;
   email: string;
   createdAt: string;
   avatar?: string;
@@ -37,6 +39,7 @@ type ProfileRow = {
   id: string;
   email: string | null;
   name: string | null;
+  tag: string | null;
   avatar: string | null;
   bio: string | null;
   credits: number;
@@ -47,6 +50,7 @@ type ProfileRow = {
 const toUser = (row: ProfileRow, session: Session): User => ({
   id: row.id,
   name: row.name ?? (row.email ?? session.user.email ?? 'moi').split('@')[0],
+  tag: row.tag ?? '',
   email: row.email ?? session.user.email ?? '',
   createdAt: row.created_at ?? session.user.created_at,
   avatar: row.avatar ?? undefined,
@@ -89,6 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser({
         id: session.user.id,
         name: (session.user.email ?? 'moi').split('@')[0],
+        tag: '',
         email: session.user.email ?? '',
         createdAt: session.user.created_at,
         credits: 0,

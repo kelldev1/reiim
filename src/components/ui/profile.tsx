@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Camera, Check, LogOut, Pencil, Trash2, X } from 'lucide-react';
+import { Camera, Check, Copy, LogOut, Pencil, Trash2, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { Loader } from '@/components/ui/loader';
@@ -72,6 +72,7 @@ const Profile: React.FC<{ className?: string }> = ({ className = '' }) => {
   const [bio, setBio] = useState(user?.bio ?? '');
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [tagCopied, setTagCopied] = useState(false);
 
   const activityCount = useMemo(() => {
     try {
@@ -268,7 +269,26 @@ const Profile: React.FC<{ className?: string }> = ({ className = '' }) => {
               <h1 className="text-xl font-bold tracking-tight text-primary md:text-2xl">
                 {user.name}
               </h1>
-              <p className="text-sm text-muted">{user.email}</p>
+              {user.tag && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(`${user.name}#${user.tag}`);
+                    setTagCopied(true);
+                    setTimeout(() => setTagCopied(false), 1500);
+                  }}
+                  className="mt-1 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:text-primary"
+                  style={{ borderColor: 'rgb(var(--color-fg) / 0.15)' }}
+                  title="Copier ton identifiant"
+                >
+                  <span className="font-semibold text-primary">
+                    {user.name}
+                    <span className="text-muted">#{user.tag}</span>
+                  </span>
+                  {tagCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                </button>
+              )}
+              <p className="mt-1 text-sm text-muted">{user.email}</p>
               {user.bio && (
                 <p className="mt-2 whitespace-pre-line text-sm text-primary/75">{user.bio}</p>
               )}

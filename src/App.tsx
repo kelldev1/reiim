@@ -4,6 +4,7 @@ import InteractiveCalendar from '@/components/ui/visualize-booking';
 import Navbar, { type Page } from '@/components/ui/navbar';
 import Dashboard from '@/components/ui/dashboard';
 import Profile from '@/components/ui/profile';
+import Friends from '@/components/ui/friends';
 import AuraBackground from '@/components/ui/background';
 import BootScreen from '@/components/ui/boot-screen';
 import AuthScreen from '@/components/ui/auth-screen';
@@ -22,6 +23,8 @@ function AppShell() {
       <Dashboard onGoToCalendar={() => setPage('calendar')} className="w-full h-full" />
     ) : page === 'calendar' ? (
       <InteractiveCalendar className="w-full h-full" />
+    ) : page === 'friends' ? (
+      <Friends className="w-full h-full" />
     ) : (
       <Profile className="w-full h-full" />
     );

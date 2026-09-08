@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CalendarDays, LayoutDashboard, Menu, X, Sun, Moon, User } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, Menu, X, Sun, Moon, User, Users } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
+import { listRequests } from '@/lib/friends';
 
-export type Page = 'dashboard' | 'calendar' | 'profile';
+export type Page = 'dashboard' | 'calendar' | 'friends' | 'profile';
 
 interface NavbarProps {
   active?: Page;
@@ -29,14 +30,29 @@ const Navbar: React.FC<NavbarProps> = ({
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
 
-  const items: { key: Page; label: string; Icon: typeof CalendarDays }[] = [
+  // Nombre de demandes d'amis reçues (badge sur l'onglet « Amis »).
+  const [pending, setPending] = useState(0);
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    const tick = () =>
+      void listRequests()
+        .then((rs) => alive && setPending(rs.filter((r) => r.direction === 'in').length))
+        .catch(() => {});
+    tick();
+    const id = setInterval(tick, 45000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [user, active]);
+
+  const items: { key: Page; label: string; Icon: typeof CalendarDays; badge?: number }[] = [
     { key: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
     { key: 'calendar', label: 'Calendrier', Icon: CalendarDays },
+    { key: 'friends', label: 'Amis', Icon: Users, badge: pending },
   ];
-  const mobileItems: { key: Page; label: string; Icon: typeof CalendarDays }[] = [
-    ...items,
-    { key: 'profile', label: 'Profil', Icon: User },
-  ];
+  const mobileItems = [...items, { key: 'profile' as Page, label: 'Profil', Icon: User }];
 
   return (
     <header
@@ -51,7 +67,7 @@ const Navbar: React.FC<NavbarProps> = ({
 
         <div className="flex justify-center">
           <ul className="hidden md:flex items-center gap-1 rounded-full ui-chip p-1">
-            {items.map(({ key, label, Icon }) => {
+            {items.map(({ key, label, Icon, badge }) => {
               const isActive = active === key;
               return (
                 <li key={key}>
@@ -76,6 +92,14 @@ const Navbar: React.FC<NavbarProps> = ({
                     >
                       {label}
                     </span>
+                    {!!badge && (
+                      <span
+                        className="relative z-[1] flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
+                        style={{ backgroundColor: 'rgb(239 68 68)' }}
+                      >
+                        {badge}
+                      </span>
+                    )}
                   </motion.button>
                 </li>
               );
@@ -171,7 +195,7 @@ const Navbar: React.FC<NavbarProps> = ({
             exit={{ opacity: 0, y: -8, height: 0 }}
             className="md:hidden flex flex-col gap-1 px-4 pb-3"
           >
-            {mobileItems.map(({ key, label, Icon }) => {
+            {mobileItems.map(({ key, label, Icon, badge }) => {
               const isActive = active === key;
               return (
                 <li key={key}>
@@ -188,6 +212,14 @@ const Navbar: React.FC<NavbarProps> = ({
                   >
                     <Icon className="h-4 w-4" />
                     {label}
+                    {!!badge && (
+                      <span
+                        className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
+                        style={{ backgroundColor: 'rgb(239 68 68)' }}
+                      >
+                        {badge}
+                      </span>
+                    )}
                   </button>
                 </li>
               );
