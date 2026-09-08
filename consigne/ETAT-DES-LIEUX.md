@@ -1,6 +1,6 @@
 # reiim — état des lieux
 
-_Dernière mise à jour : 2026-09-08 (assistant IA opérationnel ; prochain chantier = espaces des méthodes d'apprentissage, on commence par « Vidéos »)._
+_Dernière mise à jour : 2026-09-09 (« Vidéos explicatives » fait + testé ; prochaine méthode = Flashcards)._
 _Ce fichier sert de mémoire entre les sessions. Le lire en premier à la reprise._
 
 ## Projet Supabase (réel, en place)
@@ -110,32 +110,22 @@ Claude**, l'utilisateur met 5 € de crédit sur la console Anthropic.
 
 ## 3. OÙ ON S'ARRÊTE — prochaine étape
 
-L'assistant IA **marche** (testé bout-en-bout : réponse, débit crédit, log, PDF, rendu
-Markdown/KaTeX, atelier plein écran). Clé Anthropic branchée (secret `LLM_API_KEY`),
-5 € de crédit sur la console Anthropic.
+**Chantier en cours : les espaces de travail des méthodes d'apprentissage.**
 
-**Prochain chantier : coder les espaces de travail des méthodes d'apprentissage.**
-Ordre : on commence par **« Vidéos explicatives »**.
+✅ **« Vidéos explicatives » — FAIT et testé (2026-09-09).**
+- Edge Function `supabase/functions/videos/index.ts` : proxy YouTube Data API v3, vérifie
+  le JWT, recherche FR, remonte les chaînes pédago FR (allowlist `TRUSTED`). Pas de crédit.
+  Secret **`YT_API_KEY`** en place (clé « Clé API 2 » du projet Google Cloud
+  `smart-oasis-467805-p3`, restreinte à YouTube Data API v3).
+- `src/lib/videos.ts` + `VideoWorkspace` dans `method-workspaces.tsx` : recherche → cartes →
+  lecteur `youtube-nocookie` intégré + épinglage + cases « vu » + notes. Plein écran (bigMode)
+  quand `vidéos` est la seule méthode.
+- Testé : recherche « dérivée d'une fonction » → 15 vidéos, Yvan Monka en tête, lecteur OK.
 
-**Décision prise (2026-09-08)** : intégration **YouTube via l'API YouTube Data v3**
-(pas de génération de vidéo). L'utilisateur a dit « fais rien pour l'instant, on reprend
-après » juste après avoir choisi cette option — donc **RIEN n'est encore codé**.
-
-Plan pour « Vidéos explicatives » (à faire) :
-- Nouvelle Edge Function `supabase/functions/videos/index.ts` : vérifie le JWT → appelle
-  `youtube/v3/search` (+ `videos` pour durées) avec `regionCode=FR`, `relevanceLanguage=fr`
-  → renvoie une liste nettoyée (id, titre, chaîne, miniature, durée, vues). Pas de crédit
-  débité (quota YouTube = 10 000 u/j, search = 100 u). Boost d'une allowlist de chaînes
-  pédago FR (Yvan Monka / Maths et tiques, Les Bons Profs, Physique-Chimie facile…).
-- Secret **`YT_API_KEY`** (clé Google Cloud gratuite, API YouTube Data v3, sans carte) +
-  `[functions.videos] verify_jwt = true` dans `config.toml`.
-- `src/lib/videos.ts` (`searchVideos()`), et dans `method-workspaces.tsx` remplacer le
-  `StudyReminder` de la méthode `vidéos` par un vrai `VideoWorkspace` (champ chapitre +
-  bouton Trouver → cartes résultats → lecteur `<iframe>` intégré + cases « vu » + notes) ;
-  retirer `vidéos` de `METHOD_HINTS`.
-
-Après vidéos, méthodes restantes sans espace : Lecture & notes, Flashcards & mémorisation,
-Simulations & labos (voir tableau §2 — l'utilisateur décidera lesquelles méritent un espace).
+⏭️ **Méthodes restantes sans espace** (le `StudyReminder` s'affiche encore pour elles) :
+**Lecture & notes**, **Flashcards & mémorisation**, **Simulations & labos**.
+Prochaine à coder : **Flashcards & mémorisation** (deck de cartes recto/verso + mode révision
+Leitner ; autonome, sans API ni crédit ; option « générer des cartes » via l'IA en backlog).
 
 Redonner des crédits IA pendant les tests (SQL Editor) :
 `update public.profiles set credits = 100 where email = 'kelian.luye@gmail.com';`
