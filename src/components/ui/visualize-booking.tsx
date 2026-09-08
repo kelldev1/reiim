@@ -278,12 +278,11 @@ const LearningSelectionCard: React.FC<{
   // Keep method order stable (as declared in METHODS) so the stacked workspaces
   // don't jump around when toggled.
   const orderedMethods = METHODS.filter((m) => methods.includes(m.value)).map((m) => m.value);
-  // Mode plein écran pour les méthodes à 2 colonnes (exercices : énoncé / corrigé,
-  // vidéos : résultats / lecteur), quand c'est la seule méthode du devoir.
-  const bigMode =
-    !setup &&
-    orderedMethods.length === 1 &&
-    (orderedMethods[0] === 'exercices' || orderedMethods[0] === 'vidéos');
+  // Les méthodes « larges » (2 colonnes) : exercices (énoncé / corrigé), vidéos (résultats / lecteur).
+  const isWide = (m: string) => m === 'exercices' || m === 'vidéos';
+  // Carte plein écran dès qu'une méthode large est sélectionnée (seule ou combinée).
+  const bigMode = !setup && orderedMethods.some(isWide);
+  const soloWide = bigMode && orderedMethods.length === 1;
 
   const toggleMethod = (value: string) => {
     setMethods((prev) => (prev.includes(value) ? prev.filter((x) => x !== value) : [...prev, value]));
@@ -336,7 +335,9 @@ const LearningSelectionCard: React.FC<{
 
         <div
           className={`flex flex-col ${
-            bigMode ? 'h-[94vh] gap-4 p-5' : 'max-h-[85vh] gap-5 overflow-y-auto p-6'
+            bigMode
+              ? `h-[94vh] gap-4 p-5 ${soloWide ? '' : 'overflow-y-auto'}`
+              : 'max-h-[85vh] gap-5 overflow-y-auto p-6'
           }`}
         >
           {bigMode ? (
@@ -352,7 +353,10 @@ const LearningSelectionCard: React.FC<{
                   </h3>
                 </div>
                 <p className="mt-1 text-xs text-muted">
-                  {METHODS.find((x) => x.value === orderedMethods[0])?.label} ·{' '}
+                  {orderedMethods
+                    .map((m) => METHODS.find((x) => x.value === m)?.label ?? m)
+                    .join(' · ')}{' '}
+                  ·{' '}
                   <span className="capitalize">
                     {day} {monthLabel}
                   </span>
@@ -524,12 +528,20 @@ const LearningSelectionCard: React.FC<{
                 </div>
               )}
 
-              <div className={`flex flex-col gap-4 ${bigMode ? 'min-h-0 flex-1' : ''}`}>
+              <div
+                className={`flex flex-col ${
+                  soloWide ? 'min-h-0 flex-1 gap-4' : bigMode ? 'gap-6' : 'gap-4'
+                }`}
+              >
                 {orderedMethods.map((m, i) => (
                   <div
                     key={m}
                     className={`${i > 0 ? 'border-t pt-4' : ''} ${
-                      bigMode ? 'flex min-h-0 flex-1 flex-col' : ''
+                      soloWide
+                        ? 'flex min-h-0 flex-1 flex-col'
+                        : bigMode && isWide(m)
+                          ? 'flex min-h-[68vh] flex-col'
+                          : ''
                     }`}
                     style={i > 0 ? { borderColor: 'rgb(var(--color-fg) / 0.1)' } : undefined}
                   >
@@ -542,7 +554,7 @@ const LearningSelectionCard: React.FC<{
                       method={m}
                       workKey={workKey}
                       subject={subMeta?.label ?? subject}
-                      fill={bigMode}
+                      fill={bigMode && isWide(m)}
                     />
                   </div>
                 ))}
