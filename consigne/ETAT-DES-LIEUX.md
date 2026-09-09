@@ -82,7 +82,7 @@ indexés par jour × slot méthode.
 | Projets concrets (`projets`) | Checklist d'étapes + barre de progression |
 | Étude en groupe (`discussion`) | Quand / Où, participants (chips), points à aborder |
 | Cartes mentales (`mindmap`) | **Carte radiale visuelle** : nœud central + branches qui rayonnent, connecteurs colorés, édition inline, +/− branche, plein écran, génération IA gratuite |
-| Flashcards & mémorisation (`flashcards`) | Encadré « Méthode de révision » (rien à préparer) |
+| Flashcards & mémorisation (`flashcards`) | **Jeu de cartes Q/R** (génération IA gratuite depuis le chapitre + édition manuelle) + **révision immersive** : « Réviser » passe le navigateur en **plein écran**, montre une carte à la fois, on se teste puis on note « Je savais » / « À revoir ». Répétition espacée légère (boîtes 0→3), barre « X/N mémorisées ». Plein écran (bigMode). |
 
 **Méthodes retirées le 2026-09-09** (commit `a6e256c`) : Lecture & notes (`lecture`),
 Podcasts & audio (`podcast`), Simulations & labos (`simulation`), Lecture active & synthèse
@@ -100,6 +100,10 @@ Podcasts & audio (`podcast`), Simulations & labos (`simulation`), Lecture active
   Passé de sonnet-5/medium → opus-5/high le 2026-09-07 soir (réponses sonnet jugées fausses
   sur un devoir de maths avancé). Coût ≈ 3–8 c/devoir. Réglable : `MODEL` / `EFFORT`.
 - `src/lib/supabase.ts` (client), `src/lib/ai.ts` (`askAI()` — ajoute l'entête `apikey`).
+- **`SYSTEMS[feature]`** dans la fonction `ai` = surcharges par méthode (`model` / `effort` /
+  `maxTokens` / `free`). Modes **gratuits** (Sonnet 5, medium, aucun crédit débité) :
+  `mindmap` et `flashcards`.
+- Redéployer la fonction après modif : `npx supabase functions deploy ai --project-ref qfnekebcpapprfhjqrry --use-api` (depuis `H:\reiim`).
 - `SETUP.md` à la racine = la marche à suivre.
 
 **Détour Mistral (abandonné).** Entre-temps on a essayé Mistral (offre gratuite, pour
