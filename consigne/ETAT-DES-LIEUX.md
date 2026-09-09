@@ -142,11 +142,19 @@ Plan en 5 étapes :
      écritures via fonctions security-definer). `src/lib/friends.ts`, `avatar.tsx`, page
      `friends.tsx` (onglet « Amis » + badge). `name#tag` sur le profil.
    - Testé : recherche + envoi de demande OK. Pas encore testé : accept à 2 comptes.
-2. ⏭️ **Devoirs → Supabase** (le calendrier lit/écrit en base au lieu du localStorage).
-3. ⏭️ **Contenu des espaces → Supabase** (`useWork` → base).
-4. ⏭️ **Partage** : table `devoir_members` + RLS + bouton « Inviter un ami ».
-5. ⏭️ **Temps réel** (Supabase Realtime).
-⚠️ Étapes 2-3-4 = gros chantier (touche `visualize-booking.tsx` + `method-workspaces.tsx`).
+2. ✅ **Devoirs → Supabase — FAIT + migration lancée (2026-09-09).**
+3. ✅ **Contenu des espaces → Supabase — FAIT.**
+   - `20260909130000_devoirs.sql` exécutée : tables `devoirs` (unique `owner_id`+`d`) +
+     `devoir_work` (`data jsonb` par slot), RLS propriétaire, triggers `updated_at`.
+   - `src/lib/devoirs.ts` (list/upsert/delete/move + load/saveWork). `src/lib/devoir-work.tsx`
+     (`DevoirWorkProvider` charge à l'ouverture, `useWork` lit/écrit via contexte, save
+     débounce 600 ms + flush à la fermeture). `visualize-booking` : devoirs indexés par date
+     ISO, `workKey` = id du devoir, import unique du localStorage (flag `reiim-devoirs-migrated`).
+   - **Testé** : créer un devoir + éditer une carte mentale → rechargement → tout revient.
+   - localStorage n'est PLUS la source de vérité pour les devoirs.
+4. ⏭️ **Partage** : remplacer la RLS `owner-only` de `devoirs`/`devoir_work` par une table
+   `devoir_members` (owner + amis invités) ; bouton « Inviter un ami » dans la carte du devoir.
+5. ⏭️ **Temps réel** (Supabase Realtime sur `devoir_work`).
 
 ---
 
