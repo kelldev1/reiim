@@ -437,7 +437,7 @@ const LearningSelectionCard: React.FC<{
   devoirId: string;
   initial?: Selection;
   onClose: () => void;
-  onSubmit: (subject: string, methods: string[]) => void;
+  onSubmit: (subject: string, methods: string[]) => Promise<boolean>;
   onDelete: () => void;
 }> = ({ day, monthLabel, devoirId, initial, onClose, onSubmit, onDelete }) => {
   const shared = !!initial?.shared;
@@ -445,6 +445,7 @@ const LearningSelectionCard: React.FC<{
   const [subject, setSubject] = useState(initial?.subject ?? '');
   const [methods, setMethods] = useState<string[]>(initial?.methods ?? []);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const subMeta = subjectMeta(subject);
   // Keep method order stable (as declared in METHODS) so the stacked workspaces
@@ -462,7 +463,8 @@ const LearningSelectionCard: React.FC<{
     setError(null);
   };
 
-  const planify = () => {
+  const planify = async () => {
+    if (saving) return;
     if (!subject) {
       setError('Choisis une matière.');
       return;
@@ -472,7 +474,13 @@ const LearningSelectionCard: React.FC<{
       return;
     }
     setError(null);
-    onSubmit(subject, orderedMethods);
+    setSaving(true);
+    const ok = await onSubmit(subject, orderedMethods);
+    setSaving(false);
+    if (!ok) {
+      setError("Le devoir n'a pas pu être enregistré. Réessaie.");
+      return;
+    }
     setSetup(false);
   };
 
@@ -643,10 +651,11 @@ const LearningSelectionCard: React.FC<{
                 <button
                   type="button"
                   onClick={planify}
-                  className="flex-1 rounded-lg py-2.5 text-sm font-medium transition-opacity hover:opacity-90"
+                  disabled={saving}
+                  className="flex-1 rounded-lg py-2.5 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-60"
                   style={{ backgroundColor: 'rgb(var(--color-fg))', color: 'rgb(var(--color-bg))' }}
                 >
-                  {initial ? 'Mettre à jour' : 'Planifier'}
+                  {saving ? 'Enregistrement…' : initial ? 'Mettre à jour' : 'Planifier'}
                 </button>
                 {initial && (
                   <button
@@ -817,18 +826,20 @@ const InteractiveCalendar = React.forwardRef<HTMLDivElement, CalendarProps>((pro
     setSelectedDay(null);
   };
 
-  const saveSelection = (subject: string, methods: string[]) => {
-    if (!selectedDay) return;
+  const saveSelection = async (subject: string, methods: string[]): Promise<boolean> => {
+    if (!selectedDay) return false;
     const iso = keyFor(year, month, selectedDay);
-    void upsertDevoir(iso, subject, methods)
-      .then((dv) => {
-        setSelections((prev) => ({
-          ...prev,
-          [iso]: { id: dv.id, subject: dv.subject, methods: dv.methods },
-        }));
-      })
-      .catch(() => {});
-    // Card stays open on the method workspace(s).
+    try {
+      const dv = await upsertDevoir(iso, subject, methods);
+      setSelections((prev) => ({
+        ...prev,
+        [iso]: { id: dv.id, subject: dv.subject, methods: dv.methods },
+      }));
+      return true; // la carte reste ouverte sur l'espace de travail
+    } catch (e) {
+      console.error('[reiim] upsertDevoir a échoué', e);
+      return false;
+    }
   };
 
   const deleteSelection = () => {
