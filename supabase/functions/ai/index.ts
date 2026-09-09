@@ -61,16 +61,39 @@ EXACTITUDE (impératif) :
 - Pas d'approximation ni d'anachronisme. Relis mentalement chaque fait avant de le mettre.
 - Français, niveau et programme de l'élève.`;
 
+const SYSTEM_FLASHCARDS = `Tu crées un jeu de FLASHCARDS de révision pour un élève (collège / lycée, France) sur le sujet donné.
+
+Réponds UNIQUEMENT avec un tableau JSON valide, sans texte autour, sans balises \`\`\`. Forme :
+[{"q":"<question courte>","a":"<réponse courte et exacte>"}]
+
+Règles :
+- 12 à 16 cartes couvrant les notions clés du chapitre (définitions, dates, formules, vocabulaire, causes / conséquences, exemples types).
+- Question : précise, une seule chose demandée. Réponse : la plus courte possible tout en restant complète (un mot, une date, une phrase, une formule).
+- La réponse ne répète jamais la question.
+
+EXACTITUDE (impératif) :
+- Chaque date, nom propre, chiffre, définition, formule doit être EXACT et vérifiable dans un manuel scolaire.
+- En cas de doute sur une précision, reste général ou omets la carte plutôt que d'inventer.
+- Pas d'anachronisme, pas d'approximation. Relis mentalement chaque fait.
+- Français, niveau et programme de l'élève.`;
+
 const SYSTEMS: Record<
   string,
   { system: string; maxTokens: number; effort: string; free?: boolean; model?: string }
 > = {
-  // Génération de carte mentale = gratuite. Sonnet 5 + effort medium : assez fiable
-  // pour du contenu scolaire, moins cher qu'Opus pour une fonctionnalité offerte.
+  // Contenus de révision générés = gratuits. Sonnet 5 + effort medium : assez fiable
+  // pour du scolaire, moins cher qu'Opus pour une fonctionnalité offerte.
   mindmap: {
     system: SYSTEM_MINDMAP,
     model: 'claude-sonnet-5',
     maxTokens: 1600,
+    effort: 'medium',
+    free: true,
+  },
+  flashcards: {
+    system: SYSTEM_FLASHCARDS,
+    model: 'claude-sonnet-5',
+    maxTokens: 2200,
     effort: 'medium',
     free: true,
   },
@@ -154,7 +177,7 @@ Deno.serve(async (req: Request) => {
 
   const intro = subject ? `Matière : ${subject}\n\n` : '';
   const text = mode
-    ? `${intro}Sujet de la carte : ${prompt || subject || 'le chapitre en cours'}`
+    ? `${intro}Sujet / chapitre : ${prompt || subject || 'le chapitre en cours'}`
     : pdf
       ? `${intro}${prompt || "Fais le devoir de l'énoncé joint (PDF), en entier."}`
       : `${intro}Énoncé / devoir :\n${prompt}`;

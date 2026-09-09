@@ -448,8 +448,9 @@ const LearningSelectionCard: React.FC<{
   // don't jump around when toggled.
   const orderedMethods = METHODS.filter((m) => methods.includes(m.value)).map((m) => m.value);
   // Méthodes qui ont besoin de la carte plein écran : exercices (énoncé / corrigé),
-  // vidéos (résultats / lecteur), mindmap (canevas radial).
-  const isWide = (m: string) => m === 'exercices' || m === 'vidéos' || m === 'mindmap';
+  // vidéos (résultats / lecteur), mindmap (canevas radial), flashcards (jeu + révision).
+  const isWide = (m: string) =>
+    m === 'exercices' || m === 'vidéos' || m === 'mindmap' || m === 'flashcards';
   // Carte plein écran dès qu'une de ces méthodes est sélectionnée (seule ou combinée).
   const bigMode = !setup && orderedMethods.some(isWide);
   const soloWide = bigMode && orderedMethods.length === 1;

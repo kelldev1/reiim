@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bookmark,
   BookmarkCheck,
@@ -7,9 +7,11 @@ import {
   ExternalLink,
   FileText,
   FileUp,
+  Layers,
   PenLine,
   Play,
   Plus,
+  RotateCcw,
   Search,
   Share2,
   Sparkles,
@@ -1153,21 +1155,408 @@ const VideoWorkspace: React.FC<{ workKey: string; subject: string; fill?: boolea
   );
 };
 
-/* ---------- Révision (méthodes sans espace de travail) ---------- */
+/* ---------- Flashcards & mémorisation ---------- */
 
-const METHOD_HINTS: Record<string, string> = {
-  flashcards: 'Révise avec des flashcards / répétition espacée le jour prévu.',
+type Flashcard = { id: string; q: string; a: string; box: number };
+type FlashWork = { topic?: string; cards: Flashcard[] };
+
+const MASTERED_BOX = 3; // 3 bonnes réponses d'affilée → carte mémorisée
+
+const parseFlashcards = (answer: string): Flashcard[] => {
+  let s = answer.trim();
+  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) s = fence[1].trim();
+  const a = s.indexOf('[');
+  const b = s.lastIndexOf(']');
+  if (a >= 0 && b > a) s = s.slice(a, b + 1);
+  const raw = JSON.parse(s) as unknown;
+  if (!Array.isArray(raw)) throw new Error('format');
+  return raw
+    .map((c: any) => ({
+      id: uid(),
+      q: String(c?.q ?? c?.question ?? '').trim().slice(0, 400),
+      a: String(c?.a ?? c?.answer ?? c?.r ?? '').trim().slice(0, 600),
+      box: 0,
+    }))
+    .filter((c) => c.q && c.a)
+    .slice(0, 24);
 };
 
-const StudyReminder: React.FC<{ method: string }> = ({ method }) => (
+/** Session de révision immersive : prend l'écran (plein écran navigateur), montre
+ *  une carte à la fois, l'élève se teste puis note s'il savait. */
+const FlashcardReview: React.FC<{
+  cards: Flashcard[];
+  onRate: (id: string, box: number) => void;
+  onClose: () => void;
+}> = ({ cards, onRate, onClose }) => {
+  // File d'attente : les moins connues d'abord. Une carte ratée revient en fin de file.
+  const [queue, setQueue] = useState<string[]>(() =>
+    [...cards].sort((x, y) => x.box - y.box).map((c) => c.id),
+  );
+  const [pos, setPos] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const [stats, setStats] = useState({ knew: 0, missed: 0 });
+  const total = cards.length;
+
+  const byId = useMemo(() => {
+    const m: Record<string, Flashcard> = {};
+    for (const c of cards) m[c.id] = c;
+    return m;
+  }, [cards]);
+
+  // Plein écran navigateur — « prend le contrôle » le temps de la révision.
+  useEffect(() => {
+    const el = document.documentElement;
+    if (el.requestFullscreen) void el.requestFullscreen().catch(() => {});
+    return () => {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        void document.exitFullscreen().catch(() => {});
+      }
+    };
+  }, []);
+
+  const current: Flashcard | undefined = queue[pos] ? byId[queue[pos]] : undefined;
+  const done = !current;
+
+  const rate = (knew: boolean) => {
+    if (!current) return;
+    const nextBox = knew ? Math.min(MASTERED_BOX, current.box + 1) : 1;
+    onRate(current.id, nextBox);
+    setStats((s) => ({ knew: s.knew + (knew ? 1 : 0), missed: s.missed + (knew ? 0 : 1) }));
+    setFlipped(false);
+    if (knew) {
+      setPos((p) => p + 1);
+    } else {
+      // la remettre plus loin dans la session
+      setQueue((q) => [...q, current.id]);
+      setPos((p) => p + 1);
+    }
+  };
+
+  const restart = () => {
+    setQueue([...cards].sort((x, y) => x.box - y.box).map((c) => c.id));
+    setPos(0);
+    setFlipped(false);
+    setStats({ knew: 0, missed: 0 });
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') return onClose();
+      if (done) return;
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        if (!flipped) setFlipped(true);
+        else rate(true);
+      }
+      if (flipped && (e.key === 'ArrowLeft' || e.key === '1')) rate(false);
+      if (flipped && (e.key === 'ArrowRight' || e.key === '2')) rate(true);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  const seen = Math.min(pos, queue.length);
+  const progress = queue.length ? (seen / queue.length) * 100 : 100;
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex flex-col"
+      style={{ backgroundColor: 'rgb(var(--color-bg))' }}
+    >
+      {/* barre haut */}
+      <div className="flex items-center gap-4 px-5 py-3">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-muted transition-colors hover:text-primary"
+        >
+          <X className="h-4 w-4" /> Quitter
+        </button>
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ backgroundColor: 'rgb(var(--color-fg) / 0.1)' }}>
+          <div
+            className="h-full rounded-full transition-all"
+            style={{ width: `${progress}%`, backgroundColor: 'rgb(var(--color-fg))' }}
+          />
+        </div>
+        <span className="text-xs tabular-nums text-muted">
+          {done ? total : Math.min(seen + 1, queue.length)} / {queue.length}
+        </span>
+      </div>
+
+      {done ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-5 px-6 text-center">
+          <div
+            className="flex h-16 w-16 items-center justify-center rounded-2xl"
+            style={{ backgroundColor: 'rgb(var(--color-fg) / 0.06)' }}
+          >
+            <Check className="h-8 w-8 text-primary" />
+          </div>
+          <div>
+            <p className="text-xl font-semibold text-primary">Session terminée</p>
+            <p className="mt-1 text-sm text-muted">
+              {stats.knew} carte{stats.knew > 1 ? 's' : ''} sue{stats.knew > 1 ? 's' : ''} ·{' '}
+              {stats.missed} à retravailler
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={restart}
+              className="flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium text-muted transition-colors hover:text-primary"
+              style={{ borderColor: 'rgb(var(--color-fg) / 0.15)' }}
+            >
+              <RotateCcw className="h-4 w-4" /> Recommencer
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg px-5 py-2 text-sm font-medium transition-opacity hover:opacity-90"
+              style={{ backgroundColor: 'rgb(var(--color-fg))', color: 'rgb(var(--color-bg))' }}
+            >
+              Terminer
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6 pb-10">
+          <button
+            type="button"
+            onClick={() => !flipped && setFlipped(true)}
+            className="flex w-full max-w-2xl flex-col items-center rounded-3xl border px-8 py-14 text-center transition-colors"
+            style={{
+              borderColor: 'rgb(var(--color-fg) / 0.12)',
+              backgroundColor: 'rgb(var(--color-surface))',
+              cursor: flipped ? 'default' : 'pointer',
+              minHeight: '46vh',
+            }}
+          >
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-soft">
+              {flipped ? 'Réponse' : 'Question'}
+            </span>
+            <p className="mt-4 text-2xl font-medium leading-snug text-primary">{current.q}</p>
+            {flipped && (
+              <>
+                <div className="my-6 h-px w-16" style={{ backgroundColor: 'rgb(var(--color-fg) / 0.2)' }} />
+                <p className="text-xl leading-snug text-primary/90">{current.a}</p>
+              </>
+            )}
+            {!flipped && (
+              <span className="mt-8 text-xs text-muted-soft">Clique ou appuie sur Espace pour voir</span>
+            )}
+          </button>
+
+          {flipped && (
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => rate(false)}
+                className="flex items-center gap-1.5 rounded-xl border px-5 py-2.5 text-sm font-semibold transition-colors"
+                style={{ borderColor: 'rgb(239 68 68 / 0.4)', color: 'rgb(239 68 68)' }}
+              >
+                <X className="h-4 w-4" /> À revoir
+              </button>
+              <button
+                type="button"
+                onClick={() => rate(true)}
+                className="flex items-center gap-1.5 rounded-xl px-6 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90"
+                style={{ backgroundColor: 'rgb(34 197 94)', color: '#fff' }}
+              >
+                <Check className="h-4 w-4" /> Je savais
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const FlashcardsWorkspace: React.FC<{ workKey: string; subject: string; fill?: boolean }> = ({
+  workKey,
+  subject,
+  fill = false,
+}) => {
+  const [d, set] = useWork<FlashWork>(workKey, 'flashcards', { cards: [] });
+  const topic = d.topic ?? '';
+  const cards = d.cards ?? [];
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+
+  const mastered = cards.filter((c) => c.box >= MASTERED_BOX).length;
+
+  const generate = async () => {
+    if (busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const { answer } = await askAI({ feature: 'flashcards', subject, prompt: topic });
+      const fresh = parseFlashcards(answer);
+      if (!fresh.length) throw new Error('vide');
+      set((p) => ({ ...p, cards: fresh }));
+    } catch (e) {
+      setErr(e instanceof AIError ? e.message : "Les cartes n'ont pas pu être générées.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const patch = (id: string, p: Partial<Flashcard>) =>
+    set((prev) => ({ ...prev, cards: (prev.cards ?? []).map((c) => (c.id === id ? { ...c, ...p } : c)) }));
+  const removeCard = (id: string) =>
+    set((prev) => ({ ...prev, cards: (prev.cards ?? []).filter((c) => c.id !== id) }));
+  const addCard = () =>
+    set((prev) => ({ ...prev, cards: [...(prev.cards ?? []), { id: uid(), q: '', a: '', box: 0 }] }));
+  const rate = (id: string, box: number) => patch(id, { box });
+  const resetProgress = () =>
+    set((prev) => ({ ...prev, cards: (prev.cards ?? []).map((c) => ({ ...c, box: 0 })) }));
+
+  return (
+    <div className={`flex flex-col gap-3 ${fill ? 'min-h-0 flex-1' : ''}`}>
+      <PaneHead icon={<Layers className="h-3.5 w-3.5" />}>Flashcards</PaneHead>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          value={topic}
+          onChange={(e) => set((p) => ({ ...p, topic: e.target.value }))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void generate();
+          }}
+          placeholder="Chapitre à réviser (ex. le présent de l'indicatif)…"
+          className={`${inputCls} min-w-[12rem] flex-1`}
+          style={inputStyle}
+        />
+        <button
+          type="button"
+          onClick={generate}
+          disabled={busy}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-40"
+          style={{ backgroundColor: 'rgb(var(--color-fg))', color: 'rgb(var(--color-bg))' }}
+        >
+          {busy ? <Loader variant="dots" size={16} /> : <Sparkles className="h-4 w-4" />}
+          {busy ? 'Génère…' : cards.length ? 'Régénérer' : 'Générer'}
+        </button>
+        <span className="text-xs text-muted">gratuit</span>
+      </div>
+
+      {err ? (
+        <p className="text-xs" style={{ color: 'rgb(239 68 68)' }}>
+          {err}
+        </p>
+      ) : (
+        <p className="text-[11px] text-muted-soft">
+          « Générer » crée un jeu de cartes (gratuit). Puis « Réviser » : la révision prend
+          l'écran et te teste carte par carte jusqu'à ce que tout soit mémorisé.
+        </p>
+      )}
+
+      {cards.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setReviewing(true)}
+            className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-opacity hover:opacity-90"
+            style={{ backgroundColor: 'rgb(34 197 94)', color: '#fff' }}
+          >
+            <Play className="h-4 w-4" /> Réviser
+          </button>
+          <div className="flex min-w-[8rem] flex-1 items-center gap-2">
+            <div
+              className="h-1.5 flex-1 overflow-hidden rounded-full"
+              style={{ backgroundColor: 'rgb(var(--color-fg) / 0.1)' }}
+            >
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${(mastered / cards.length) * 100}%`,
+                  backgroundColor: 'rgb(34 197 94)',
+                }}
+              />
+            </div>
+            <span className="shrink-0 text-xs tabular-nums text-muted">
+              {mastered}/{cards.length} mémorisées
+            </span>
+          </div>
+          {mastered > 0 && (
+            <button
+              type="button"
+              onClick={resetProgress}
+              className="text-xs text-muted-soft underline transition-colors hover:text-primary"
+            >
+              réinitialiser
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className={`flex flex-col gap-2 ${fill ? 'min-h-0 flex-1 overflow-y-auto pr-1' : ''}`}>
+        {cards.length === 0 && !busy && (
+          <p className="rounded-lg border border-dashed p-4 text-sm text-muted" style={{ borderColor: 'rgb(var(--color-fg) / 0.15)' }}>
+            Aucune carte pour l'instant — génère-les depuis le chapitre, ou ajoute-les à la main.
+          </p>
+        )}
+        {cards.map((c, i) => (
+          <div
+            key={c.id}
+            className="grid grid-cols-[1.5rem_1fr_1fr_1.5rem] items-start gap-2 rounded-lg border p-2"
+            style={{ borderColor: 'rgb(var(--color-fg) / 0.12)' }}
+          >
+            <span className="pt-2 text-center text-[11px] tabular-nums text-muted-soft">{i + 1}</span>
+            <textarea
+              value={c.q}
+              onChange={(e) => patch(c.id, { q: e.target.value })}
+              rows={2}
+              placeholder="Question / recto"
+              className={`${inputCls} resize-none`}
+              style={inputStyle}
+            />
+            <textarea
+              value={c.a}
+              onChange={(e) => patch(c.id, { a: e.target.value })}
+              rows={2}
+              placeholder="Réponse / verso"
+              className={`${inputCls} resize-none`}
+              style={inputStyle}
+            />
+            <button
+              type="button"
+              onClick={() => removeCard(c.id)}
+              aria-label="Supprimer la carte"
+              className="pt-2 text-muted-soft transition-colors hover:text-primary"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={addCard}
+          className="rounded-lg border border-dashed py-2 text-xs font-medium text-muted transition-colors hover:text-primary"
+          style={{ borderColor: 'rgb(var(--color-fg) / 0.2)' }}
+        >
+          + Ajouter une carte
+        </button>
+      </div>
+
+      {reviewing && cards.length > 0 && (
+        <FlashcardReview cards={cards} onRate={rate} onClose={() => setReviewing(false)} />
+      )}
+    </div>
+  );
+};
+
+/* ---------- Révision (méthodes sans espace de travail) ---------- */
+
+const StudyReminder: React.FC = () => (
   <div
     className="rounded-lg border border-dashed p-4 text-sm"
     style={{ borderColor: 'rgb(var(--color-fg) / 0.15)' }}
   >
     <p className="font-medium text-primary">Méthode de révision</p>
     <p className="mt-1 text-muted">
-      {METHOD_HINTS[method] ?? 'Révise le jour prévu.'} Pas d'espace de travail à préparer ici — le
-      jour J, coche le devoir quand c'est fait.
+      Révise le jour prévu. Pas d'espace de travail à préparer ici — le jour J, coche le
+      devoir quand c'est fait.
     </p>
   </div>
 );
@@ -1191,7 +1580,9 @@ export const MethodWorkspace: React.FC<{
       return <GroupWorkspace workKey={workKey} />;
     case 'mindmap':
       return <MindMapWorkspace workKey={workKey} subject={subject} fill={fill} />;
+    case 'flashcards':
+      return <FlashcardsWorkspace workKey={workKey} subject={subject} fill={fill} />;
     default:
-      return <StudyReminder method={method} />;
+      return <StudyReminder />;
   }
 };
