@@ -78,12 +78,16 @@ indexés par jour × slot méthode.
 | Méthode | Espace |
 |---|---|
 | **Exercices pratiques** (`exercices`) | **Assistant IA qui FAIT le devoir**. Si c'est la seule méthode → carte **plein écran** en 2 colonnes : à gauche l'**énoncé** (upload d'un **PDF** visualisé + zone texte), à droite le **corrigé** rendu en Markdown + maths KaTeX, bouton **Copier**. Bouton « Faire le devoir » / « Refaire ». Le PDF est envoyé tel quel à Claude (document block). Décompte des crédits. PDF gardé en mémoire (pas persisté — voir backlog). |
+| Vidéos explicatives (`vidéos`) | Recherche YouTube (Edge Function `videos`), lecteur intégré, épinglage + notes ; plein écran |
 | Projets concrets (`projets`) | Checklist d'étapes + barre de progression |
 | Étude en groupe (`discussion`) | Quand / Où, participants (chips), points à aborder |
-| Cartes mentales (`mindmap`) | **Carte radiale visuelle** : nœud central + branches qui rayonnent, connecteurs colorés, édition inline, +/− branche, plein écran |
-| Podcasts & audio (`podcast`) | Liste de ressources (titre, lien, note, coché) |
-| Lecture active & synthèse (`lecture_active`) | Idées clés / Questions / synthèse |
-| Vidéos, Lecture & notes, Flashcards, Simulations & labos | Encadré « Méthode de révision » (rien à préparer) |
+| Cartes mentales (`mindmap`) | **Carte radiale visuelle** : nœud central + branches qui rayonnent, connecteurs colorés, édition inline, +/− branche, plein écran, génération IA gratuite |
+| Flashcards & mémorisation (`flashcards`) | Encadré « Méthode de révision » (rien à préparer) |
+
+**Méthodes retirées le 2026-09-09** (commit `a6e256c`) : Lecture & notes (`lecture`),
+Podcasts & audio (`podcast`), Simulations & labos (`simulation`), Lecture active & synthèse
+(`lecture_active`). Il ne reste que les 6 ci-dessus. Composants morts supprimés
+(`AudioWorkspace`, `SynthesisWorkspace`, `TextList`).
 
 ### Backend IA (déployé le 2026-09-07)
 - `supabase/migrations/20260907120000_init.sql` : tables `profiles` + `ai_usage`, RLS,
