@@ -35,6 +35,9 @@ export const DevoirWorkProvider: React.FC<{
 
   useEffect(() => {
     let alive = true;
+    // Reset de l'état synchronisé quand on change de devoir (la clé vient d'une
+    // prop) — cas légitime que la règle react-hooks sur-signale.
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
     setWork({});
     latest.current = {};
     setLoadFailed(false);

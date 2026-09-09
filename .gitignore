@@ -25,7 +25,3 @@ supabase/.temp/
 *.local
 .idea/
 .vs/
-
-# dotnet (projet mixte)
-bin/
-obj/

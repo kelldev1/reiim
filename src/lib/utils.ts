@@ -19,7 +19,7 @@ function toVal(mix: ClassValue): string {
       for (let i = 0; i < mix.length; i++) {
         if (mix[i]) {
           if ((y = toVal(mix[i]))) {
-            str && (str += ' ');
+            if (str) str += ' ';
             str += y;
           }
         }
@@ -27,7 +27,7 @@ function toVal(mix: ClassValue): string {
     } else if (mix) {
       for (k in mix) {
         if (mix[k]) {
-          str && (str += ' ');
+          if (str) str += ' ';
           str += k;
         }
       }
@@ -46,7 +46,7 @@ function clsx(...inputs: ClassValue[]): string {
   while (i < inputs.length) {
     if ((tmp = inputs[i++])) {
       if ((x = toVal(tmp))) {
-        out && (out += ' ');
+        if (out) out += ' ';
         out += x;
       }
     }

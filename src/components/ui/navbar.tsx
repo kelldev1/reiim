@@ -45,7 +45,7 @@ const Navbar: React.FC<NavbarProps> = ({
       alive = false;
       clearInterval(id);
     };
-  }, [user, active]);
+  }, [user]);
 
   const items: { key: Page; label: string; Icon: typeof CalendarDays; badge?: number }[] = [
     { key: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },

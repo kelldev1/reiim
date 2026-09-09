@@ -1,121 +1,81 @@
-# Reiim - Study Workload Manager
+# reiim
 
-Reiim is a Windows-native application designed to help manage study workload through an interactive calendar interface. The application provides a visual representation of your schedule with meeting information, hover effects, and animated transitions for an engaging user experience.
+Application web (React + TypeScript) qui aide les élèves du **collège et du lycée** à
+**prendre de l'avance sur leurs devoirs**.
 
-## Features
+Deux briques :
 
-- **Interactive Calendar**: View your schedule in a clean, grid-based layout
-- **Hover Effects**: See meeting counts and details when hovering over calendar days
-- **Animated Transitions**: Smooth animations using Framer Motion for view transitions and item reveal
-- **Responsive Design**: Adapts to different screen sizes with a flexible layout
-- **Meeting Details**: View detailed information about scheduled events including time, title, participants, and location
-- **Glassmorphism Design**: Modern translucent glass theme throughout the application
+1. **Un calendrier** en glisser-déposer pour planifier chaque devoir : une matière + une
+   ou plusieurs **méthodes de travail**.
+2. **Un espace de travail par méthode**, dont plusieurs avec **assistance IA** :
+   - *Exercices pratiques* — l'assistant fait le devoir (Markdown + maths KaTeX, PDF accepté)
+   - *Vidéos explicatives* — recherche YouTube intégrée (chaînes pédago FR remontées)
+   - *Cartes mentales* — carte radiale, génération IA gratuite
+   - *Flashcards & mémorisation* — jeu de cartes + révision immersive plein écran
+   - *Projets concrets*, *Étude en groupe* — organisateurs simples
 
-## Tech Stack
+Plus : **système d'amis** (`Pseudo#TAG`) et **partage d'un devoir** (l'invité voit tout, en
+temps réel).
 
-- **Framework**: React 18 with TypeScript
-- **Build Tool**: Vite
-- **Styling**: Tailwind CSS
-- **Animations**: Framer Motion
-- **Icons**: Lucide React
-- **Language**: TypeScript
+> **Accès privé.** L'inscription publique est fermée ; les comptes sont créés à la main.
+> Voir `SETUP.md` → « Accès privé ».
 
-## Getting Started
+## Stack
 
-### Prerequisites
+| | |
+|---|---|
+| Front | Vite 4, React 18, TypeScript (strict), Tailwind CSS 3, framer-motion 10, three.js |
+| Backend | **Supabase** — Postgres + Auth + RLS + Edge Functions (Deno) |
+| IA | Proxy Edge Function → API Anthropic (Claude). La clé ne quitte jamais le serveur. |
+| Vidéos | Proxy Edge Function → YouTube Data API v3 |
 
-- Node.js (v16 or higher)
-- npm or yarn
+Tout le détail d'infra (migrations, secrets, déploiement des fonctions) est dans
+**`SETUP.md`**. L'état d'avancement et les décisions produit sont dans
+**`consigne/ETAT-DES-LIEUX.md`**.
 
-### Installation
+## Démarrer en local
 
-1. Clone the repository
-2. Navigate to the project directory:
-   ```bash
-   cd reiim
-   ```
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-### Development
-
-To start the development server:
 ```bash
-npm run dev
+npm install
+cp .env.example .env      # puis remplir VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
+npm run dev               # http://localhost:3000
 ```
 
-The application will be available at `http://localhost:5173` (or another port if 5173 is in use).
+Le backend (Supabase + fonctions) est déjà déployé pour ce projet — le front local s'y
+connecte directement.
 
-### Production Build
+## Scripts
 
-To create a production build:
-```bash
-npm run build
+| Commande | Effet |
+|---|---|
+| `npm run dev` | serveur de dev (port 3000) |
+| `npm run build` | `tsc --noEmit` + build de prod dans `dist/` |
+| `npm run typecheck` | vérification TypeScript seule |
+| `npm run lint` / `lint:fix` | ESLint |
+| `npm run check` | typecheck + lint |
+| `npm run preview` | sert le build de prod |
+
+## Structure
+
+```
+src/
+  App.tsx                     coquille : navbar + vue courante
+  main.tsx                    point d'entrée (ErrorBoundary + providers)
+  index.css                   tokens de thème (clair / sombre) + utilitaires
+  lib/                        données + contextes
+    supabase.ts  auth.tsx  theme.tsx  background.tsx
+    devoirs.ts   devoir-work.tsx   friends.ts   ai.ts   videos.ts
+  components/ui/
+    visualize-booking.tsx     le calendrier + la carte de devoir
+    method-workspaces.tsx     tous les espaces de travail par méthode
+    dashboard.tsx  navbar.tsx  friends.tsx  profile.tsx  auth-screen.tsx
+    markdown.tsx  avatar.tsx  loader.tsx  error-boundary.tsx
+supabase/
+  migrations/                 schéma + RLS (à appliquer via le SQL Editor ou `db push`)
+  functions/ai/               proxy IA (Deno)
+  functions/videos/           proxy YouTube (Deno)
 ```
 
-To preview the production build:
-```bash
-npm run preview
-```
+## Licence
 
-## Project Structure
-
-```
-reiim/
-├── src/
-│   ├── components/
-│   │   └── ui/
-│   │       └── visualize-booking.tsx  # Main calendar component
-│   ├── App.tsx                      # Root component
-│   └── main.tsx                     # Entry point
-├── public/
-├── index.html
-├── package.json
-├── tsconfig.json
-├── tailwind.config.js
-├── vite.config.ts
-└── README.md
-```
-
-## Customization
-
-The calendar data is defined in the `DAYS` array within `src/components/ui/visualize-booking.tsx`. You can modify this array to reflect your own schedule:
-
-```typescript
-const DAYS: DayType[] = [
-  {
-    day: '02',
-    classNames: 'bg-[#1e1e1e] cursor-pointer',
-    meetingInfo: [
-      {
-        date: 'Wed, 2 Nov',
-        time: '10:00 AM - 11:00 AM',
-        title: 'Design Review Meeting',
-        participants: ['Alice Johnson', 'Mark Lee'],
-        location: 'Zoom',
-      },
-      // ... more meetings
-    ],
-  },
-  // ... more days
-];
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## License
-
-This project is private and all rights are reserved.
-
-## Acknowledgments
-
-- Inspired by modern calendar and scheduling applications
-- Built with ❤️ using React and Tailwind CSS
+Projet privé, tous droits réservés.

@@ -103,14 +103,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      await loadProfile(data.session);
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
       setLoading(false);
-    });
+    };
+    // Filet : si Supabase ne répond pas, on n'reste pas bloqué sur l'écran de
+    // démarrage — on bascule sur l'écran de connexion.
+    const t = window.setTimeout(finish, 8000);
+    supabase.auth
+      .getSession()
+      .then(async ({ data }) => {
+        await loadProfile(data.session);
+      })
+      .catch((e) => console.error('[reiim] getSession a échoué', e))
+      .finally(() => {
+        window.clearTimeout(t);
+        finish();
+      });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       void loadProfile(session);
     });
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      window.clearTimeout(t);
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
