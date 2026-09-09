@@ -1,7 +1,28 @@
 # reiim — état des lieux
 
-_Dernière mise à jour : 2026-09-09 (Vidéos + Cartes mentales faites ; système d'amis Pseudo#TAG fait — début du partage de devoirs)._
+_Dernière mise à jour : 2026-09-09 (audit production : lots 1-3 corrigés — voir §6)._
 _Ce fichier sert de mémoire entre les sessions. Le lire en premier à la reprise._
+
+## 0. Audit production (2026-09-09) — verdict : PAS prêt pour de vrais clients
+
+L'app est **techniquement solide** (RLS auditée OK, 0 secret fuité, 0 vuln runtime, pas
+d'XSS/injection) mais il manque **4 briques bloquantes** : paiement, pages légales,
+déploiement, monitoring. Détail complet + tableau par point : voir §6. Corrections faites
+cette session (commits `7535d8b` → `1c3b459`) :
+- **Robustesse** : ErrorBoundary global ; `saveWork`/`loadWork` remontent leurs erreurs
+  (avant : perte de travail silencieuse) + indicateur « Enregistrement… / non enregistré » ;
+  `deleteSelection`/`moveSelection` rollback + bandeau ; `auth` non bloquante si Supabase muet.
+- **a11y / perf** : plus de `AnimatePresence mode="wait"` (gel reduced-motion) ; fond 30 img/s
+  en reduced-motion ; fin du flash de thème (script inline dans `index.html`).
+- **SEO** : `lang="fr"`, meta description, Open Graph, favicon reiim, `robots.txt`.
+- **Edge** : CORS configurable (`ALLOWED_ORIGINS`), rate-limit sur `videos` (throttle 3 s +
+  40/j/user — protège le quota YouTube partagé). Fonctions redéployées.
+- **Hygiène** : `npm run lint` réparé (0 erreur) ; squelette .NET mort supprimé ; README réécrit.
+
+**Décisions en attente** (ne pas inventer) : prestataire de paiement + modèle ; contenu des
+pages légales (mentions, CGV, confidentialité — élèves potentiellement mineurs !) ; RGPD /
+bandeau cookies ; monitoring (Sentry ?) ; hébergeur + domaine ; SMTP custom Supabase ;
+**régénérer la clé API Anthropic** (collée en clair dans une conversation).
 
 ## Projet Supabase (réel, en place)
 
@@ -302,3 +323,50 @@ SETUP.md                      marche à suivre config (à faire par l'utilisateu
 
 Storage localStorage : `reiim-theme`, `reiim-learning-selections`, `reiim-devoir-work`.
 Supabase gère la session auth (plus de `reiim-users` / `reiim-session`).
+
+---
+
+## 6. AUDIT PRODUCTION (2026-09-09) — rapport détaillé
+
+Verdict : **NON prêt pour de vrais clients.** Base technique saine, mais briques
+commerciales/légales absentes.
+
+### Bloquant (rien ne peut être vendu tel quel)
+| Point | État |
+|---|---|
+| **Paiement** | Aucun. Pas de Stripe/Lemon Squeezy, crédits fixés à la main. → décision |
+| **Pages légales** | Aucune : mentions légales, CGV, politique de confidentialité. Obligatoire (données perso, **élèves potentiellement mineurs**). → décision (contenu/avocat) |
+| **RGPD / cookies** | Pas de politique, pas de bandeau. Pas d'export/suppression de compte côté user. → décision |
+| **Déploiement** | L'app ne tourne qu'en local (`localhost:3000`). Front à déployer (Vercel/Netlify/CF Pages) + domaine. Le backend Supabase est en ligne. → décision |
+| **Monitoring** | Aucun (Sentry/équiv.). Un bug client = invisible. → décision |
+| **Tests** | Zéro. Parcours critiques à couvrir : login→dashboard, créer devoir→reload→persiste, askAI (402/429/422/réseau), RLS cross-user, flush saveWork à la fermeture, parse JSON IA. |
+
+### Corrigé cette session
+| Zone | Avant → après |
+|---|---|
+| Perte de travail silencieuse | `saveWork`/`loadWork` ignoraient `.error` → remontent, indicateur SyncStatus, load KO ⇒ pas d'écrasement |
+| Écran blanc sur erreur de rendu | → `ErrorBoundary` global + écran de secours |
+| `deleteDevoir`/`moveDevoir` `.catch(()=>{})` | → rollback UI + bandeau d'erreur |
+| `AnimatePresence mode="wait"` (navbar) | gèle sous reduced-motion → swap direct |
+| Flash de thème au chargement (CLS) | → script inline dans `index.html` (avant 1er rendu) |
+| CORS `*` en dur sur les 2 fonctions edge | → secret `ALLOWED_ORIGINS` (vide ⇒ `*`) |
+| `videos` : 0 rate-limit (quota YouTube = 100 recherches/j pour TOUS) | → throttle 3 s + 40/j/user |
+| `npm run lint` : 31 erreurs | → 0 erreur (config eslint alignée) |
+| `index.html` : `lang="en"`, pas de meta desc/OG, favicon Vite | → `lang="fr"` + SEO de base + favicon reiim |
+| `auth` bloquée si Supabase muet | → catch + timeout 8 s → écran de connexion |
+| `supabase.ts` : fallback silencieux si env absent | → throw explicite |
+| Dépôt : squelette .NET mort, backups, README d'un autre projet | → supprimés / réécrit |
+
+### Non bloquant mais à faire avant lancement large
+- **Plafond de dépense IA global** (Opus 5 high = 3-8 c/devoir, aucun cap). Compteur mensuel + coupe-circuit.
+- **SMTP custom** pour les emails Auth (mot de passe oublié) — le SMTP partagé Supabase = 3/h, pas viable. Et il n'y a **pas de « mot de passe oublié »** dans l'UI.
+- **`prefers-reduced-motion`** : le shader de fond ne se fige pas (juste 30 img/s). Proposer un vrai réglage « fond statique » dans les préférences.
+- **Contraste** : `.text-muted-soft` (~3:1) échoue WCAG AA. Passe de design nécessaire.
+- **Calendrier drag&drop** : pas d'alternative clavier (inaccessible).
+- **Mobile** : les workspaces (atelier exercices, mindmap) peu optimisés < 500 px.
+- **Bundle** 1,1 Mo (306 Ko gzip). `manualChunks` + lazy-load des vues.
+- **Pas de cache de données** : `listDevoirs` etc. refetchés à chaque navigation.
+- **Avatars** = data-URL base64 en base (bloat les listes d'amis). → Supabase Storage.
+- **`find_user_by_tag`** énumérable (name/avatar/id, pas d'email) sans rate-limit.
+- **vite/esbuild** : 2 vulns dev-only (serveur de dev). Monter vite v4→v8 (breaking) un jour.
+- **`method-workspaces.tsx`** (1588 l.) : à découper en un fichier par workspace.
