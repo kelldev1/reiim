@@ -1,5 +1,5 @@
 -- reiim — système d'amis (identité "Pseudo#TAG", à la Valorant).
--- Applied with `supabase db push` (ou coller dans le SQL Editor).
+-- À appliquer via "supabase db push" ou en collant dans le SQL Editor.
 
 -- ---------------------------------------------------------------------------
 -- 1. tag sur profiles  →  identité = name || '#' || tag
