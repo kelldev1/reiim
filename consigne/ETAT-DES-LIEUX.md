@@ -1,6 +1,6 @@
 # reiim — état des lieux
 
-_Dernière mise à jour : 2026-09-09 (méthodes « Vidéos » + « Cartes mentales » faites ; reste Lecture&notes / Flashcards / Simulations)._
+_Dernière mise à jour : 2026-09-09 (Vidéos + Cartes mentales faites ; système d'amis Pseudo#TAG fait — début du partage de devoirs)._
 _Ce fichier sert de mémoire entre les sessions. Le lire en premier à la reprise._
 
 ## Projet Supabase (réel, en place)
@@ -122,15 +122,33 @@ Claude**, l'utilisateur met 5 € de crédit sur la console Anthropic.
   quand `vidéos` est la seule méthode.
 - Testé : recherche « dérivée d'une fonction » → 15 vidéos, Yvan Monka en tête, lecteur OK.
 
-✅ **« Cartes mentales » — FAIT (2026-09-09).** `MindMapWorkspace` réécrit : carte radiale
-visuelle (SVG connecteurs + bulles `<input>` positionnées, layout radial auto `placeTree`),
-une couleur par branche niveau 1, sélection → boutons +/×, profondeur max 4, plein écran
-(bigMode). Données `MindNode`/`MindWork` inchangées.
+✅ **« Cartes mentales » — FAIT (2026-09-09).** `MindMapWorkspace` : carte radiale visuelle
+(bulles `<textarea>` auto-hauteur, connecteurs Bézier, pastilles couleur niveau 1, fond
+pointillé, vue recentrée). Bouton **« Générer » GRATUIT** (feature `mindmap` dans la fonction
+`ai` : Sonnet 5, effort medium, prompt strict-JSON + exigence d'exactitude, PAS de crédit).
 
-⏭️ **Méthodes restantes sans espace** (le `StudyReminder` s'affiche encore) :
-**Lecture & notes**, **Flashcards & mémorisation**, **Simulations & labos**.
-Prochaine suggérée : **Flashcards & mémorisation** (deck recto/verso + révision Leitner ;
-autonome, sans API ni crédit ; « générer des cartes » via l'IA en backlog).
+⏭️ **Méthodes restantes sans espace** : **Lecture & notes**, **Flashcards & mémorisation**,
+**Simulations & labos**.
+
+---
+
+## 4. SOCIAL / PARTAGE DE DEVOIRS — en cours
+
+But utilisateur : « j'invite un ami sur un devoir → il voit tout (corrigé, carte, notes) ».
+Plan en 5 étapes :
+1. ✅ **Système d'amis `Pseudo#TAG` — FAIT + migration lancée (2026-09-09).**
+   - `20260909120000_friends.sql` exécutée (SQL Editor). `profiles.tag` (4 car., unique, auto).
+     Compte actuel = **riley#CQ2W**. Tables `friend_requests` + `friends` (RLS lecture seule,
+     écritures via fonctions security-definer). `src/lib/friends.ts`, `avatar.tsx`, page
+     `friends.tsx` (onglet « Amis » + badge). `name#tag` sur le profil.
+   - Testé : recherche + envoi de demande OK. Pas encore testé : accept à 2 comptes.
+2. ⏭️ **Devoirs → Supabase** (le calendrier lit/écrit en base au lieu du localStorage).
+3. ⏭️ **Contenu des espaces → Supabase** (`useWork` → base).
+4. ⏭️ **Partage** : table `devoir_members` + RLS + bouton « Inviter un ami ».
+5. ⏭️ **Temps réel** (Supabase Realtime).
+⚠️ Étapes 2-3-4 = gros chantier (touche `visualize-booking.tsx` + `method-workspaces.tsx`).
+
+---
 
 Redonner des crédits IA pendant les tests (SQL Editor) :
 `update public.profiles set credits = 100 where email = 'kelian.luye@gmail.com';`
