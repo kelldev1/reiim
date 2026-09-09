@@ -6,6 +6,10 @@ export interface Devoir {
   date: string;
   subject: string;
   methods: string[];
+  /** true si le devoir appartient à un ami qui m'a invité. */
+  shared?: boolean;
+  /** `Pseudo#TAG` du propriétaire (uniquement pour un devoir partagé). */
+  ownerHandle?: string;
 }
 
 type Row = { id: string; d: string; subject: string; methods: string[] | null };
@@ -16,14 +20,36 @@ const toDevoir = (r: Row): Devoir => ({
   methods: r.methods ?? [],
 });
 
-/** Tous les devoirs de l'utilisateur (le volume reste petit). */
+/** Mes devoirs + ceux partagés avec moi (le volume reste petit). */
 export async function listDevoirs(): Promise<Devoir[]> {
-  const { data, error } = await supabase
-    .from('devoirs')
-    .select('id, d, subject, methods')
-    .order('d');
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((r) => toDevoir(r as Row));
+  const [own, shared] = await Promise.all([
+    supabase.from('devoirs').select('id, d, subject, methods').order('d'),
+    supabase.rpc('list_shared_devoirs'),
+  ]);
+  if (own.error) throw new Error(own.error.message);
+  const owned = (own.data ?? []).map((r) => toDevoir(r as Row));
+  const ownedDates = new Set(owned.map((d) => d.date));
+  const sharedDevoirs: Devoir[] = (
+    (shared.data ?? []) as {
+      id: string;
+      d: string;
+      subject: string;
+      methods: string[] | null;
+      owner_name: string;
+      owner_tag: string;
+    }[]
+  )
+    .map((r) => ({
+      id: r.id,
+      date: r.d,
+      subject: r.subject,
+      methods: r.methods ?? [],
+      shared: true,
+      ownerHandle: `${r.owner_name}#${r.owner_tag}`,
+    }))
+    // pas de collision : si j'ai déjà un devoir ce jour-là, le mien passe d'abord
+    .filter((d) => !ownedDates.has(d.date));
+  return [...owned, ...sharedDevoirs];
 }
 
 /** Crée ou met à jour le devoir du jour (`date` = `YYYY-MM-DD`). */
@@ -82,4 +108,58 @@ export async function saveWork(
       { devoir_id: devoirId, slot, data, updated_at: new Date().toISOString() },
       { onConflict: 'devoir_id,slot' },
     );
+}
+
+/* ---------- partage ---------- */
+
+export interface DevoirMember {
+  id: string;
+  name: string;
+  tag: string;
+  avatar?: string;
+  role: 'owner' | 'member';
+}
+
+export type InviteResult = 'ok' | 'not-owner' | 'not-friend' | 'already-member';
+
+export async function inviteToDevoir(
+  devoirId: string,
+  friendId: string,
+): Promise<InviteResult> {
+  const { data, error } = await supabase.rpc('invite_to_devoir', {
+    p_devoir: devoirId,
+    p_friend: friendId,
+  });
+  if (error) throw new Error(error.message);
+  return data as InviteResult;
+}
+
+export async function removeDevoirMember(
+  devoirId: string,
+  userId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('remove_devoir_member', {
+    p_devoir: devoirId,
+    p_user: userId,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function listDevoirMembers(devoirId: string): Promise<DevoirMember[]> {
+  const { data } = await supabase.rpc('list_devoir_members', { p_devoir: devoirId });
+  return (
+    (data ?? []) as {
+      user_id: string;
+      name: string;
+      tag: string;
+      avatar: string | null;
+      role: 'owner' | 'member';
+    }[]
+  ).map((r) => ({
+    id: r.user_id,
+    name: r.name,
+    tag: r.tag,
+    avatar: r.avatar ?? undefined,
+    role: r.role,
+  }));
 }

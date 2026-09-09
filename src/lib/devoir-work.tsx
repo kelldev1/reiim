@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { loadWork, saveWork } from '@/lib/devoirs';
+import { supabase } from '@/lib/supabase';
 
 // Contenu des espaces de travail d'un devoir : chargé depuis Supabase quand la
 // carte s'ouvre, sauvegardé (débounce) à chaque modification. Une entrée par
@@ -56,6 +57,34 @@ export const DevoirWorkProvider: React.FC<{
     };
   }, [devoirId]);
 
+  // temps réel : reflète les modifications faites par un autre membre du devoir
+  useEffect(() => {
+    if (!devoirId) return;
+    const channel = supabase
+      .channel(`devoir_work:${devoirId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'devoir_work',
+          filter: `devoir_id=eq.${devoirId}`,
+        },
+        (payload) => {
+          const row = payload.new as { slot?: string; data?: unknown };
+          if (!row?.slot) return;
+          // ignore l'écho de nos propres écritures
+          if (JSON.stringify(row.data) === JSON.stringify(latest.current[row.slot])) return;
+          latest.current[row.slot] = row.data;
+          setWork((prev) => ({ ...prev, [row.slot as string]: row.data }));
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [devoirId]);
+
   const set = (slot: string, data: unknown) => {
     latest.current[slot] = data;
     setWork((prev) => ({ ...prev, [slot]: data }));
@@ -81,13 +110,16 @@ export function useWork<T>(_workKey: string, slot: string, initial: T) {
   const touched = useRef(false);
   const initialRef = useRef(initial);
 
-  // Adopte la valeur serveur une fois prête, tant que l'utilisateur n'a pas édité.
+  // Valeur serveur courante (change de référence quand le temps réel la met à jour).
+  const serverVal = ctx?.ready ? ctx.get(slot) : undefined;
+
+  // Adopte la valeur serveur tant que l'utilisateur n'a pas édité ce slot.
+  // (Une fois « touché », l'utilisateur possède ce champ pour la session.)
   useEffect(() => {
     if (ctx?.ready && !touched.current) {
-      const v = ctx.get(slot);
-      setData(v === undefined ? initialRef.current : (v as T));
+      setData(serverVal === undefined ? initialRef.current : (serverVal as T));
     }
-  }, [ctx?.ready, ctx, slot]);
+  }, [ctx?.ready, serverVal]);
 
   const update = (next: T | ((prev: T) => T)) => {
     touched.current = true;

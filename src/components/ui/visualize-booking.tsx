@@ -1,15 +1,22 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useCallback, useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { LayoutDashboard, LayoutGrid, GripVertical, Trash2 } from 'lucide-react';
+import { LayoutDashboard, LayoutGrid, GripVertical, LogOut, Trash2, UserPlus } from 'lucide-react';
 import { MethodWorkspace } from '@/components/ui/method-workspaces';
 import { DevoirWorkProvider } from '@/lib/devoir-work';
 import {
   deleteDevoir,
+  inviteToDevoir,
+  listDevoirMembers,
   listDevoirs,
   moveDevoir,
+  removeDevoirMember,
   upsertDevoir,
   type Devoir,
+  type DevoirMember,
 } from '@/lib/devoirs';
+import { listFriends, type Friend } from '@/lib/friends';
+import { useAuth } from '@/lib/auth';
+import { Avatar } from '@/components/ui/avatar';
 import { Loader } from '@/components/ui/loader';
 
 const daysOfWeek = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
@@ -18,6 +25,8 @@ export interface Selection {
   id: string;
   subject: string;
   methods: string[];
+  shared?: boolean;
+  ownerHandle?: string;
 }
 /** Devoirs de l'utilisateur, indexés par date ISO `YYYY-MM-DD`. */
 export type Selections = Record<string, Selection>;
@@ -60,7 +69,13 @@ const keyFor = (year: number, month: number, day: string) =>
 const toSelections = (devoirs: Devoir[]): Selections => {
   const out: Selections = {};
   for (const d of devoirs) {
-    out[d.date] = { id: d.id, subject: d.subject, methods: d.methods };
+    out[d.date] = {
+      id: d.id,
+      subject: d.subject,
+      methods: d.methods,
+      shared: d.shared,
+      ownerHandle: d.ownerHandle,
+    };
   }
   return out;
 };
@@ -238,6 +253,15 @@ const Day: React.FC<DayProps> = ({ day, dragActive, onOpen, onDropNew, onMove })
           <span className="min-w-0 flex-1 truncate text-[10px] font-semibold leading-none text-primary">
             {sub?.label ?? day.selection.subject}
           </span>
+          {day.selection.shared && (
+            <span
+              className="shrink-0 rounded px-1 text-[8px] font-bold uppercase leading-none text-primary"
+              style={{ backgroundColor: 'rgb(var(--color-fg) / 0.12)' }}
+              title={`Partagé par ${day.selection.ownerHandle ?? ''}`}
+            >
+              partagé
+            </span>
+          )}
           {day.selection.methods.length > 1 && (
             <span
               className="shrink-0 rounded px-1 text-[9px] font-bold leading-none text-primary"
@@ -287,6 +311,118 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   </div>
 );
 
+/** Membres du devoir + bouton « Inviter un ami » (propriétaire) / « Quitter » (invité). */
+const MembersBar: React.FC<{
+  devoirId: string;
+  isOwner: boolean;
+  ownerHandle?: string;
+}> = ({ devoirId, isOwner, ownerHandle }) => {
+  const [members, setMembers] = useState<DevoirMember[]>([]);
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [picking, setPicking] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const reload = useCallback(() => {
+    if (!devoirId) return;
+    void listDevoirMembers(devoirId).then(setMembers).catch(() => {});
+  }, [devoirId]);
+  useEffect(reload, [reload]);
+
+  if (!devoirId) return null;
+
+  const openPicker = async () => {
+    setPicking((p) => !p);
+    if (friends.length === 0) setFriends(await listFriends());
+  };
+  const invite = async (fid: string) => {
+    setPicking(false);
+    try {
+      const res = await inviteToDevoir(devoirId, fid);
+      setMsg(
+        res === 'ok'
+          ? 'Invité ✓'
+          : res === 'already-member'
+            ? 'Déjà dans le devoir'
+            : res === 'not-friend'
+              ? "Pas dans tes amis"
+              : 'Échec',
+      );
+      reload();
+    } catch {
+      setMsg('Échec');
+    }
+    setTimeout(() => setMsg(null), 1800);
+  };
+
+  const memberIds = new Set(members.map((m) => m.id));
+  const invitable = friends.filter((f) => !memberIds.has(f.id));
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      {members.length > 0 && (
+        <div className="flex items-center -space-x-2">
+          {members.map((m) => (
+            <span
+              key={m.id}
+              title={`${m.name}#${m.tag}${m.role === 'owner' ? ' · propriétaire' : ''}`}
+              className="rounded-full"
+              style={{ boxShadow: '0 0 0 2px rgb(var(--color-surface))' }}
+            >
+              <Avatar name={m.name} src={m.avatar} size={26} />
+            </span>
+          ))}
+        </div>
+      )}
+
+      {isOwner ? (
+        <div className="relative">
+          <button
+            type="button"
+            onClick={openPicker}
+            className="flex items-center gap-1 rounded-full border px-2.5 py-1 font-medium text-muted transition-colors hover:text-primary"
+            style={{ borderColor: 'rgb(var(--color-fg) / 0.15)' }}
+          >
+            <UserPlus className="h-3.5 w-3.5" /> Inviter un ami
+          </button>
+          {picking && (
+            <div
+              className="absolute left-0 top-full z-20 mt-1 max-h-56 w-60 overflow-y-auto rounded-xl border p-1 shadow-xl"
+              style={{
+                backgroundColor: 'rgb(var(--color-surface))',
+                borderColor: 'rgb(var(--color-fg) / 0.15)',
+              }}
+            >
+              {invitable.length === 0 ? (
+                <p className="p-2 text-muted">
+                  Aucun ami à inviter — ajoute des amis dans l'onglet « Amis ».
+                </p>
+              ) : (
+                invitable.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => void invite(f.id)}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-black/5"
+                  >
+                    <Avatar name={f.name} src={f.avatar} size={22} />
+                    <span className="truncate text-primary">
+                      {f.name}
+                      <span className="text-muted">#{f.tag}</span>
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        ownerHandle && <span className="text-muted">partagé par {ownerHandle}</span>
+      )}
+      {msg && <span className="font-medium text-primary">{msg}</span>}
+    </div>
+  );
+};
+
 const LearningSelectionCard: React.FC<{
   day: string;
   monthLabel: string;
@@ -296,6 +432,7 @@ const LearningSelectionCard: React.FC<{
   onSubmit: (subject: string, methods: string[]) => void;
   onDelete: () => void;
 }> = ({ day, monthLabel, devoirId, initial, onClose, onSubmit, onDelete }) => {
+  const shared = !!initial?.shared;
   const [setup, setSetup] = useState(!initial);
   const [subject, setSubject] = useState(initial?.subject ?? '');
   const [methods, setMethods] = useState<string[]>(initial?.methods ?? []);
@@ -388,25 +525,28 @@ const LearningSelectionCard: React.FC<{
                   <span className="capitalize">
                     {day} {monthLabel}
                   </span>
+                  {shared && initial?.ownerHandle ? ` · partagé par ${initial.ownerHandle}` : ''}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1.5 pr-7">
-                <button
-                  type="button"
-                  onClick={() => setSetup(true)}
-                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:text-primary"
-                  style={{ backgroundColor: 'rgb(var(--color-fg) / 0.05)' }}
-                >
-                  Changer
-                </button>
+                {!shared && (
+                  <button
+                    type="button"
+                    onClick={() => setSetup(true)}
+                    className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:text-primary"
+                    style={{ backgroundColor: 'rgb(var(--color-fg) / 0.05)' }}
+                  >
+                    Changer
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={onDelete}
-                  aria-label="Supprimer ce devoir"
+                  aria-label={shared ? 'Quitter ce devoir' : 'Supprimer ce devoir'}
                   className="rounded-lg p-2 text-muted transition-colors hover:text-primary"
                   style={{ backgroundColor: 'rgb(var(--color-fg) / 0.05)' }}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  {shared ? <LogOut className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
                 </button>
               </div>
             </div>
@@ -519,6 +659,7 @@ const LearningSelectionCard: React.FC<{
             </>
           ) : (
             <DevoirWorkProvider devoirId={devoirId}>
+              <MembersBar devoirId={devoirId} isOwner={!shared} ownerHandle={initial?.ownerHandle} />
               {!bigMode && (
                 <div
                   className="flex items-start justify-between gap-3 rounded-xl p-3"
@@ -546,13 +687,15 @@ const LearningSelectionCard: React.FC<{
                       ))}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setSetup(true)}
-                    className="shrink-0 text-xs font-medium text-muted transition-colors hover:text-primary"
-                  >
-                    Changer
-                  </button>
+                  {!shared && (
+                    <button
+                      type="button"
+                      onClick={() => setSetup(true)}
+                      className="shrink-0 text-xs font-medium text-muted transition-colors hover:text-primary"
+                    >
+                      Changer
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -588,16 +731,26 @@ const LearningSelectionCard: React.FC<{
                 ))}
               </div>
 
-              {!bigMode && (
-                <button
-                  type="button"
-                  onClick={onDelete}
-                  className="flex items-center justify-center gap-2 rounded-lg border py-2.5 text-sm font-medium transition-colors"
-                  style={{ borderColor: 'rgb(239 68 68 / 0.35)', color: 'rgb(239 68 68)' }}
-                >
-                  <Trash2 className="h-4 w-4" /> Supprimer ce devoir
-                </button>
-              )}
+              {!bigMode &&
+                (shared ? (
+                  <button
+                    type="button"
+                    onClick={onDelete}
+                    className="flex items-center justify-center gap-2 rounded-lg border py-2.5 text-sm font-medium text-muted transition-colors hover:text-primary"
+                    style={{ borderColor: 'rgb(var(--color-fg) / 0.15)' }}
+                  >
+                    <LogOut className="h-4 w-4" /> Quitter ce devoir partagé
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onDelete}
+                    className="flex items-center justify-center gap-2 rounded-lg border py-2.5 text-sm font-medium transition-colors"
+                    style={{ borderColor: 'rgb(239 68 68 / 0.35)', color: 'rgb(239 68 68)' }}
+                  >
+                    <Trash2 className="h-4 w-4" /> Supprimer ce devoir
+                  </button>
+                ))}
             </DevoirWorkProvider>
           )}
         </div>
@@ -613,6 +766,7 @@ type CalendarProps = Omit<
 
 const InteractiveCalendar = React.forwardRef<HTMLDivElement, CalendarProps>((props, ref) => {
   const { className, ...restProps } = props;
+  const { user } = useAuth();
   const [moreView, setMoreView] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [showCard, setShowCard] = useState(false);
@@ -680,14 +834,20 @@ const InteractiveCalendar = React.forwardRef<HTMLDivElement, CalendarProps>((pro
       delete next[iso];
       return next;
     });
-    void deleteDevoir(sel.id).catch(() => {});
+    // devoir partagé → on quitte ; devoir à soi → on supprime
+    if (sel.shared && user) {
+      void removeDevoirMember(sel.id, user.id).catch(() => {});
+    } else {
+      void deleteDevoir(sel.id).catch(() => {});
+    }
   };
 
   const moveSelection = (from: string, to: string) => {
     const fromKey = keyFor(year, month, from);
     const toKey = keyFor(year, month, to);
     const moving = selections[fromKey];
-    if (!moving || selections[toKey]) return; // jour cible occupé → on ignore
+    // pas de déplacement si le jour cible est pris ou si c'est un devoir partagé
+    if (!moving || moving.shared || selections[toKey]) return;
     setSelections((prev) => {
       const next = { ...prev };
       delete next[fromKey];
