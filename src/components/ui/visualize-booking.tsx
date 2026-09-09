@@ -385,34 +385,42 @@ const MembersBar: React.FC<{
             <UserPlus className="h-3.5 w-3.5" /> Inviter un ami
           </button>
           {picking && (
-            <div
-              className="absolute left-0 top-full z-20 mt-1 max-h-56 w-60 overflow-y-auto rounded-xl border p-1 shadow-xl"
-              style={{
-                backgroundColor: 'rgb(var(--color-surface))',
-                borderColor: 'rgb(var(--color-fg) / 0.15)',
-              }}
-            >
-              {invitable.length === 0 ? (
-                <p className="p-2 text-muted">
-                  Aucun ami à inviter — ajoute des amis dans l'onglet « Amis ».
-                </p>
-              ) : (
-                invitable.map((f) => (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => void invite(f.id)}
-                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-black/5"
-                  >
-                    <Avatar name={f.name} src={f.avatar} size={22} />
-                    <span className="truncate text-primary">
-                      {f.name}
-                      <span className="text-muted">#{f.tag}</span>
-                    </span>
-                  </button>
-                ))
-              )}
-            </div>
+            <>
+              <button
+                type="button"
+                aria-label="Fermer"
+                className="fixed inset-0 z-10 cursor-default"
+                onClick={() => setPicking(false)}
+              />
+              <div
+                className="absolute left-0 top-full z-20 mt-1 max-h-56 w-60 overflow-y-auto rounded-xl border p-1 shadow-xl"
+                style={{
+                  backgroundColor: 'rgb(var(--color-surface))',
+                  borderColor: 'rgb(var(--color-fg) / 0.15)',
+                }}
+              >
+                {invitable.length === 0 ? (
+                  <p className="p-2 text-muted">
+                    Aucun ami à inviter — ajoute des amis dans l'onglet « Amis ».
+                  </p>
+                ) : (
+                  invitable.map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => void invite(f.id)}
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-black/5"
+                    >
+                      <Avatar name={f.name} src={f.avatar} size={22} />
+                      <span className="truncate text-primary">
+                        {f.name}
+                        <span className="text-muted">#{f.tag}</span>
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </>
           )}
         </div>
       ) : (
