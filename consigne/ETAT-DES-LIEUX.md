@@ -110,10 +110,23 @@ Claude**, l'utilisateur met 5 € de crédit sur la console Anthropic.
 
 ## 3. OÙ ON S'ARRÊTE — prochaine étape
 
-**Social / partage : les 5 étapes du plan §4 sont codées + migrations lancées + build vert
-(commit `8305ed4`).** Reste à valider avec un 2e compte : accepter une demande d'ami,
-inviter l'ami sur un devoir, ouvrir le devoir côté invité (doit tout voir, en lecture seule),
-et vérifier la synchro temps réel (une édition d'un côté apparaît de l'autre).
+**Dashboard synchronisé avec Supabase (commit `798dd99`).** L'ancien `dashboard.tsx` était
+le template « réservations » (chiffres bidon). Il affiche maintenant les vraies données :
+KPIs (devoirs planifiés / à venir / cette semaine / crédits IA), « Devoirs à venir par
+semaine », « Répartition par matière » (donut aux couleurs des matières), « Prochains
+devoirs » (cliquable → calendrier), heatmap du mois, « Méthodes d'apprentissage ». États
+vides soignés. Le panneau de personnalisation du fond est descendu en bas.
+
+**⚠️ Régression RLS de l'étape 4 — trouvée et corrigée (migration `20260909150000`, lancée).**
+La policy `devoirs_read` (via `can_access_devoir(id)`) faisait échouer TOUS les upserts de
+devoirs en 403 (`new row violates RLS`), avalé en silence par l'appli → rien ne se
+sauvegardait. Corrigé : les policies testent `owner_id` / l'appartenance en ligne. Détail
+dans [[reiim-gotchas]]. Les devoirs de test créés avant le correctif sont perdus.
+
+**Social / partage : les 5 étapes du plan §4 sont codées + migrations lancées + build vert.**
+Reste à valider avec un 2e compte : accepter une demande d'ami, inviter l'ami sur un devoir,
+ouvrir le devoir côté invité (doit tout voir, en lecture seule), et vérifier la synchro
+temps réel (une édition d'un côté apparaît de l'autre).
 
 **Autre chantier ouvert : les espaces de travail des méthodes d'apprentissage.**
 
@@ -159,10 +172,16 @@ Plan en 5 étapes :
    - localStorage n'est PLUS la source de vérité pour les devoirs.
 4. ✅ **Partage — FAIT + migration lancée (2026-09-09).**
    - `20260909140000_devoir_sharing.sql` exécutée. Table `devoir_members` (owner + amis
-     invités), helper `can_access_devoir()` (security-definer → pas de récursion RLS), RLS
-     `devoirs`/`devoir_work` passée de « propriétaire » à « propriétaire OU membre » (lecture
-     partagée, écriture du devoir lui-même = propriétaire seul). Fonctions security-definer :
-     `invite_to_devoir` / `remove_devoir_member` / `list_devoir_members` / `list_shared_devoirs`.
+     invités), RLS `devoirs`/`devoir_work` passée de « propriétaire » à « propriétaire OU
+     membre » (lecture partagée, écriture du devoir lui-même = propriétaire seul). Fonctions
+     security-definer : `invite_to_devoir` / `remove_devoir_member` / `list_devoir_members` /
+     `list_shared_devoirs`.
+   - **⚠️ `20260909150000_devoir_rls_fix.sql` (correctif obligatoire, lancé).** La policy
+     `devoirs_read` via `can_access_devoir(id)` faisait échouer TOUS les upserts de devoirs
+     (`.upsert()` PostgREST → `INSERT ... ON CONFLICT DO UPDATE RETURNING` → Postgres applique
+     la policy SELECT à la nouvelle ligne, que `can_access_devoir` ne voit pas → 403). Les
+     policies testent maintenant `owner_id` / l'appartenance directement sur la ligne.
+     `devoir_members_visible` réduite à `user_id = auth.uid()`. Détail : [[reiim-gotchas]].
    - `src/lib/devoirs.ts` : `listDevoirs()` fusionne mes devoirs + ceux partagés (RPC
      `list_shared_devoirs`, collision de date → le mien gagne) ; `Devoir.shared`/`ownerHandle` ;
      `inviteToDevoir` / `removeDevoirMember` / `listDevoirMembers`.
@@ -171,9 +190,10 @@ Plan en 5 étapes :
      « Changer », bouton « Quitter ce devoir partagé » au lieu de « Supprimer »). Pastille
      « partagé » sur la case du calendrier. `deleteSelection` route vers `removeDevoirMember`
      si `shared`, sinon `deleteDevoir`.
-   - **Testé (1 compte)** : `MembersBar` s'affiche, menu « Inviter un ami » liste les amis
-     (vide → message OK), RPCs sans erreur, écriture `devoir_work` OK sous la nouvelle RLS.
-     Pas encore testé : invitation réelle + vue de l'invité (besoin d'un 2e compte).
+   - **Testé (1 compte, après le correctif)** : créer un devoir → rechargement → il persiste,
+     le dashboard le compte ; `MembersBar` s'affiche, menu « Inviter un ami » liste les amis
+     (vide → message OK), upsert `devoir_work` OK. Pas encore testé : invitation réelle + vue
+     de l'invité (besoin d'un 2e compte).
 5. ✅ **Temps réel — FAIT (2026-09-09).**
    - `devoir_work` + `devoir_members` ajoutées à la publication `supabase_realtime`.
    - `DevoirWorkProvider` s'abonne au canal `devoir_work:<devoirId>` (postgres_changes,
