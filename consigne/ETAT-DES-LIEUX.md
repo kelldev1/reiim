@@ -110,7 +110,12 @@ Claude**, l'utilisateur met 5 € de crédit sur la console Anthropic.
 
 ## 3. OÙ ON S'ARRÊTE — prochaine étape
 
-**Chantier en cours : les espaces de travail des méthodes d'apprentissage.**
+**Social / partage : les 5 étapes du plan §4 sont codées + migrations lancées + build vert
+(commit `8305ed4`).** Reste à valider avec un 2e compte : accepter une demande d'ami,
+inviter l'ami sur un devoir, ouvrir le devoir côté invité (doit tout voir, en lecture seule),
+et vérifier la synchro temps réel (une édition d'un côté apparaît de l'autre).
+
+**Autre chantier ouvert : les espaces de travail des méthodes d'apprentissage.**
 
 ✅ **« Vidéos explicatives » — FAIT et testé (2026-09-09).**
 - Edge Function `supabase/functions/videos/index.ts` : proxy YouTube Data API v3, vérifie
@@ -132,7 +137,7 @@ pointillé, vue recentrée). Bouton **« Générer » GRATUIT** (feature `mindma
 
 ---
 
-## 4. SOCIAL / PARTAGE DE DEVOIRS — en cours
+## 4. SOCIAL / PARTAGE DE DEVOIRS — les 5 étapes FAITES (reste : test à 2 comptes)
 
 But utilisateur : « j'invite un ami sur un devoir → il voit tout (corrigé, carte, notes) ».
 Plan en 5 étapes :
@@ -152,9 +157,30 @@ Plan en 5 étapes :
      ISO, `workKey` = id du devoir, import unique du localStorage (flag `reiim-devoirs-migrated`).
    - **Testé** : créer un devoir + éditer une carte mentale → rechargement → tout revient.
    - localStorage n'est PLUS la source de vérité pour les devoirs.
-4. ⏭️ **Partage** : remplacer la RLS `owner-only` de `devoirs`/`devoir_work` par une table
-   `devoir_members` (owner + amis invités) ; bouton « Inviter un ami » dans la carte du devoir.
-5. ⏭️ **Temps réel** (Supabase Realtime sur `devoir_work`).
+4. ✅ **Partage — FAIT + migration lancée (2026-09-09).**
+   - `20260909140000_devoir_sharing.sql` exécutée. Table `devoir_members` (owner + amis
+     invités), helper `can_access_devoir()` (security-definer → pas de récursion RLS), RLS
+     `devoirs`/`devoir_work` passée de « propriétaire » à « propriétaire OU membre » (lecture
+     partagée, écriture du devoir lui-même = propriétaire seul). Fonctions security-definer :
+     `invite_to_devoir` / `remove_devoir_member` / `list_devoir_members` / `list_shared_devoirs`.
+   - `src/lib/devoirs.ts` : `listDevoirs()` fusionne mes devoirs + ceux partagés (RPC
+     `list_shared_devoirs`, collision de date → le mien gagne) ; `Devoir.shared`/`ownerHandle` ;
+     `inviteToDevoir` / `removeDevoirMember` / `listDevoirMembers`.
+   - `visualize-booking.tsx` : `<MembersBar>` (avatars des membres + bouton « Inviter un ami »
+     → menu déroulant des amis pas encore membres). Carte de l'invité en lecture seule (pas de
+     « Changer », bouton « Quitter ce devoir partagé » au lieu de « Supprimer »). Pastille
+     « partagé » sur la case du calendrier. `deleteSelection` route vers `removeDevoirMember`
+     si `shared`, sinon `deleteDevoir`.
+   - **Testé (1 compte)** : `MembersBar` s'affiche, menu « Inviter un ami » liste les amis
+     (vide → message OK), RPCs sans erreur, écriture `devoir_work` OK sous la nouvelle RLS.
+     Pas encore testé : invitation réelle + vue de l'invité (besoin d'un 2e compte).
+5. ✅ **Temps réel — FAIT (2026-09-09).**
+   - `devoir_work` + `devoir_members` ajoutées à la publication `supabase_realtime`.
+   - `DevoirWorkProvider` s'abonne au canal `devoir_work:<devoirId>` (postgres_changes,
+     filtre `devoir_id=eq.<id>`), ignore l'écho de ses propres écritures (compare JSON), met à
+     jour `work[slot]`. `useWork` adopte la valeur serveur tant que le champ n'a pas été
+     édité localement (`serverVal` dans les deps du `useEffect` d'adoption).
+   - Pas testable à 1 compte ; code en place, publication configurée.
 
 ---
 
