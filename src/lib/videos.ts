@@ -46,8 +46,15 @@ export async function searchVideos(query: string, subject?: string): Promise<Vid
   }
 
   if (res.status === 401) throw new VideoError('auth', 'Session expirée — reconnecte-toi.');
-  if (res.status === 429)
-    throw new VideoError('quota', 'Quota de recherche atteint pour aujourd’hui — réessaie demain.');
+  if (res.status === 429) {
+    const kind = await res
+      .json()
+      .then((b) => (b as { error?: string }).error)
+      .catch(() => undefined);
+    if (kind === 'rate-limit')
+      throw new VideoError('quota', 'Doucement — attends quelques secondes.');
+    throw new VideoError('quota', 'Trop de recherches pour aujourd’hui — réessaie demain.');
+  }
   if (!res.ok) throw new VideoError('server', 'La recherche de vidéos a échoué.');
 
   const body = (await res.json()) as { videos?: Video[] };

@@ -99,32 +99,45 @@ const SYSTEMS: Record<
   },
 };
 
-const cors: Record<string, string> = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+// Origines autorisées : secret ALLOWED_ORIGINS (liste séparée par des virgules).
+// Vide ⇒ '*' (dev / avant de fixer le domaine de prod).
+const ALLOWED = (Deno.env.get('ALLOWED_ORIGINS') ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+const corsFor = (req: Request): Record<string, string> => {
+  const origin = req.headers.get('Origin') ?? '';
+  const allow = ALLOWED.length === 0 ? '*' : ALLOWED.includes(origin) ? origin : ALLOWED[0];
+  return {
+    'Access-Control-Allow-Origin': allow,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    Vary: 'Origin',
+  };
 };
 
-const json = (body: unknown, status = 200) =>
+const json = (body: unknown, status = 200, cors: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
     status,
     headers: { ...cors, 'Content-Type': 'application/json' },
   });
 
 Deno.serve(async (req: Request) => {
+  const cors = corsFor(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
-  if (req.method !== 'POST') return json({ error: 'method-not-allowed' }, 405);
+  if (req.method !== 'POST') return json({ error: 'method-not-allowed' }, 405, cors);
 
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
   const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
   const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const LLM_API_KEY = Deno.env.get('LLM_API_KEY');
   if (!SUPABASE_URL || !ANON_KEY || !SERVICE_KEY || !LLM_API_KEY) {
-    return json({ error: 'server-misconfigured' }, 500);
+    return json({ error: 'server-misconfigured' }, 500, cors);
   }
 
   const authHeader = req.headers.get('Authorization') ?? '';
-  if (!authHeader.startsWith('Bearer ')) return json({ error: 'auth' }, 401);
+  if (!authHeader.startsWith('Bearer ')) return json({ error: 'auth' }, 401, cors);
 
   // 1. verify the caller
   const asUser = createClient(SUPABASE_URL, ANON_KEY, {
@@ -134,7 +147,7 @@ Deno.serve(async (req: Request) => {
     data: { user },
     error: userErr,
   } = await asUser.auth.getUser();
-  if (userErr || !user) return json({ error: 'auth' }, 401);
+  if (userErr || !user) return json({ error: 'auth' }, 401, cors);
 
   const body = (await req.json().catch(() => ({}))) as {
     prompt?: unknown;
@@ -148,9 +161,9 @@ Deno.serve(async (req: Request) => {
   // PDF de l'énoncé, encodé base64 (sans le préfixe data:).
   const pdf = typeof body.pdf === 'string' ? body.pdf : '';
   const mode = SYSTEMS[feature];
-  if (!prompt && !pdf && !mode) return json({ error: 'empty-prompt' }, 400);
-  if (prompt.length > 8000) return json({ error: 'prompt-too-long' }, 400);
-  if (pdf.length > 9_000_000) return json({ error: 'pdf-too-large' }, 400);
+  if (!prompt && !pdf && !mode) return json({ error: 'empty-prompt' }, 400, cors);
+  if (prompt.length > 8000) return json({ error: 'prompt-too-long' }, 400, cors);
+  if (pdf.length > 9_000_000) return json({ error: 'pdf-too-large' }, 400, cors);
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
@@ -161,7 +174,7 @@ Deno.serve(async (req: Request) => {
     .select('id', { count: 'exact', head: true })
     .eq('user_id', user.id)
     .gte('created_at', since);
-  if ((count ?? 0) > 0) return json({ error: 'rate-limit' }, 429);
+  if ((count ?? 0) > 0) return json({ error: 'rate-limit' }, 429, cors);
 
   // 3. dépense 1 crédit — sauf pour les modes gratuits (ex. carte mentale).
   let remaining = -1;
@@ -169,8 +182,8 @@ Deno.serve(async (req: Request) => {
     const { data, error: deductErr } = await admin.rpc('deduct_ai_credit', {
       p_user: user.id,
     });
-    if (deductErr) return json({ error: 'server' }, 500);
-    if (data === -1) return json({ error: 'no-credits' }, 402);
+    if (deductErr) return json({ error: 'server' }, 500, cors);
+    if (data === -1) return json({ error: 'no-credits' }, 402, cors);
     remaining = data as number;
   }
   const refund = () => (mode?.free ? Promise.resolve() : admin.rpc('refund_ai_credit', { p_user: user.id }));
@@ -205,7 +218,7 @@ Deno.serve(async (req: Request) => {
     if (msg.stop_reason === 'refusal') {
       await refund();
       const cat = msg.stop_details?.category ?? 'refusal';
-      return json({ error: 'refused', detail: String(cat) }, 422);
+      return json({ error: 'refused', detail: String(cat) }, 422, cors);
     }
 
     const answer = ((msg.content ?? []) as any[])
@@ -216,7 +229,7 @@ Deno.serve(async (req: Request) => {
 
     if (!answer) {
       await refund();
-      return json({ error: 'refused', detail: msg.stop_reason ?? 'empty-response' }, 422);
+      return json({ error: 'refused', detail: msg.stop_reason ?? 'empty-response' }, 422, cors);
     }
 
     await admin.from('ai_usage').insert({
@@ -228,7 +241,7 @@ Deno.serve(async (req: Request) => {
       cached_input_tokens: msg.usage?.cache_read_input_tokens ?? 0,
     });
 
-    return json({ answer, creditsLeft: remaining });
+    return json({ answer, creditsLeft: remaining }, 200, cors);
   } catch (err) {
     await refund();
 
@@ -237,12 +250,12 @@ Deno.serve(async (req: Request) => {
       const detail = String(err.message ?? 'api-error').slice(0, 400);
       console.error('llm-error', status, detail);
       // 429 → on le relaie tel quel pour que le front dise "doucement".
-      if (status === 429) return json({ error: 'rate-limit' }, 429);
-      return json({ error: 'ai-failed', status, detail }, 502);
+      if (status === 429) return json({ error: 'rate-limit' }, 429, cors);
+      return json({ error: 'ai-failed', status, detail }, 502, cors);
     }
 
     const detail = String((err as Error)?.message ?? err).slice(0, 400);
     console.error('ai-failed', detail);
-    return json({ error: 'ai-failed', status: null, detail }, 502);
+    return json({ error: 'ai-failed', status: null, detail }, 502, cors);
   }
 });
