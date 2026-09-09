@@ -2,16 +2,25 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { LayoutDashboard, LayoutGrid, GripVertical, Trash2 } from 'lucide-react';
 import { MethodWorkspace } from '@/components/ui/method-workspaces';
+import { DevoirWorkProvider } from '@/lib/devoir-work';
+import {
+  deleteDevoir,
+  listDevoirs,
+  moveDevoir,
+  upsertDevoir,
+  type Devoir,
+} from '@/lib/devoirs';
+import { Loader } from '@/components/ui/loader';
 
 const daysOfWeek = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 
 export interface Selection {
+  id: string;
   subject: string;
   methods: string[];
 }
+/** Devoirs de l'utilisateur, indexés par date ISO `YYYY-MM-DD`. */
 export type Selections = Record<string, Selection>;
-
-const STORAGE_KEY = 'reiim-learning-selections';
 
 export const SUBJECTS = [
   { value: 'mathématiques', label: 'Mathématiques', color: '#3b82f6' },
@@ -44,32 +53,50 @@ export const METHODS = [
 const subjectMeta = (v: string) => SUBJECTS.find((s) => s.value === v);
 const methodLabel = (v: string) => METHODS.find((m) => m.value === v)?.label ?? v;
 
-const keyFor = (year: number, month: number, day: string) => `${year}-${month + 1}-${day}`;
+// Clé = date ISO `YYYY-MM-DD` (indépendante du mois affiché). `day` est déjà « 07 ».
+const keyFor = (year: number, month: number, day: string) =>
+  `${year}-${String(month + 1).padStart(2, '0')}-${day}`;
 
-const readSelections = (): Selections => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as Record<
-      string,
-      { subject?: string; method?: string; methods?: string[] }
-    >;
-    const out: Selections = {};
-    for (const [k, v] of Object.entries(parsed)) {
-      const methods = v.methods ?? (v.method ? [v.method] : []);
-      if (v.subject && methods.length) out[k] = { subject: v.subject, methods };
-    }
-    return out;
-  } catch {
-    return {};
+const toSelections = (devoirs: Devoir[]): Selections => {
+  const out: Selections = {};
+  for (const d of devoirs) {
+    out[d.date] = { id: d.id, subject: d.subject, methods: d.methods };
   }
+  return out;
 };
-const writeSelections = (s: Selections) => {
+
+// Import unique des devoirs créés en local avant le passage à Supabase.
+const importLegacyDevoirs = async (): Promise<void> => {
+  if (localStorage.getItem('reiim-devoirs-migrated')) return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+    const raw = localStorage.getItem('reiim-learning-selections');
+    const work = JSON.parse(localStorage.getItem('reiim-devoir-work') ?? '{}') as Record<
+      string,
+      Record<string, unknown>
+    >;
+    if (raw) {
+      const parsed = JSON.parse(raw) as Record<
+        string,
+        { subject?: string; method?: string; methods?: string[] }
+      >;
+      const { saveWork } = await import('@/lib/devoirs');
+      for (const [k, v] of Object.entries(parsed)) {
+        const methods = v.methods ?? (v.method ? [v.method] : []);
+        if (!v.subject || methods.length === 0) continue;
+        // ancienne clé "2026-9-07" → ISO "2026-09-07"
+        const m = k.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+        if (!m) continue;
+        const iso = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+        const dv = await upsertDevoir(iso, v.subject, methods);
+        for (const [slot, data] of Object.entries(work[k] ?? {})) {
+          await saveWork(dv.id, slot, data);
+        }
+      }
+    }
   } catch {
-    /* ignore */
+    /* best effort */
   }
+  localStorage.setItem('reiim-devoirs-migrated', '1');
 };
 
 const DND_MIME = 'text/plain';
@@ -263,12 +290,12 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
 const LearningSelectionCard: React.FC<{
   day: string;
   monthLabel: string;
-  workKey: string;
+  devoirId: string;
   initial?: Selection;
   onClose: () => void;
   onSubmit: (subject: string, methods: string[]) => void;
   onDelete: () => void;
-}> = ({ day, monthLabel, workKey, initial, onClose, onSubmit, onDelete }) => {
+}> = ({ day, monthLabel, devoirId, initial, onClose, onSubmit, onDelete }) => {
   const [setup, setSetup] = useState(!initial);
   const [subject, setSubject] = useState(initial?.subject ?? '');
   const [methods, setMethods] = useState<string[]>(initial?.methods ?? []);
@@ -491,7 +518,7 @@ const LearningSelectionCard: React.FC<{
               </div>
             </>
           ) : (
-            <>
+            <DevoirWorkProvider devoirId={devoirId}>
               {!bigMode && (
                 <div
                   className="flex items-start justify-between gap-3 rounded-xl p-3"
@@ -553,7 +580,7 @@ const LearningSelectionCard: React.FC<{
                     )}
                     <MethodWorkspace
                       method={m}
-                      workKey={workKey}
+                      workKey={devoirId}
                       subject={subMeta?.label ?? subject}
                       fill={bigMode && isWide(m)}
                     />
@@ -571,7 +598,7 @@ const LearningSelectionCard: React.FC<{
                   <Trash2 className="h-4 w-4" /> Supprimer ce devoir
                 </button>
               )}
-            </>
+            </DevoirWorkProvider>
           )}
         </div>
       </motion.div>
@@ -591,10 +618,24 @@ const InteractiveCalendar = React.forwardRef<HTMLDivElement, CalendarProps>((pro
   const [showCard, setShowCard] = useState(false);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selections, setSelections] = useState<Selections>({});
+  const [loading, setLoading] = useState(true);
   const [dragActive, setDragActive] = useState(false);
 
   useEffect(() => {
-    setSelections(readSelections());
+    let alive = true;
+    void (async () => {
+      await importLegacyDevoirs();
+      try {
+        const devoirs = await listDevoirs();
+        if (alive) setSelections(toSelections(devoirs));
+      } catch {
+        /* affiche un calendrier vide plutôt que de crasher */
+      }
+      if (alive) setLoading(false);
+    })();
+    return () => {
+      alive = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -616,35 +657,51 @@ const InteractiveCalendar = React.forwardRef<HTMLDivElement, CalendarProps>((pro
 
   const saveSelection = (subject: string, methods: string[]) => {
     if (!selectedDay) return;
-    setSelections((prev) => {
-      const next = { ...prev, [keyFor(year, month, selectedDay)]: { subject, methods } };
-      writeSelections(next);
-      return next;
-    });
+    const iso = keyFor(year, month, selectedDay);
+    void upsertDevoir(iso, subject, methods)
+      .then((dv) => {
+        setSelections((prev) => ({
+          ...prev,
+          [iso]: { id: dv.id, subject: dv.subject, methods: dv.methods },
+        }));
+      })
+      .catch(() => {});
     // Card stays open on the method workspace(s).
   };
 
   const deleteSelection = () => {
     if (!selectedDay) return;
+    const iso = keyFor(year, month, selectedDay);
+    const sel = selections[iso];
+    closeCard();
+    if (!sel) return;
     setSelections((prev) => {
       const next = { ...prev };
-      delete next[keyFor(year, month, selectedDay)];
-      writeSelections(next);
+      delete next[iso];
       return next;
     });
-    closeCard();
+    void deleteDevoir(sel.id).catch(() => {});
   };
 
   const moveSelection = (from: string, to: string) => {
+    const fromKey = keyFor(year, month, from);
+    const toKey = keyFor(year, month, to);
+    const moving = selections[fromKey];
+    if (!moving || selections[toKey]) return; // jour cible occupé → on ignore
     setSelections((prev) => {
-      const fromKey = keyFor(year, month, from);
-      const moving = prev[fromKey];
-      if (!moving) return prev;
       const next = { ...prev };
       delete next[fromKey];
-      next[keyFor(year, month, to)] = moving;
-      writeSelections(next);
+      next[toKey] = moving;
       return next;
+    });
+    void moveDevoir(moving.id, toKey).catch(() => {
+      // rollback si le serveur refuse
+      setSelections((prev) => {
+        const next = { ...prev };
+        delete next[toKey];
+        next[fromKey] = moving;
+        return next;
+      });
     });
   };
 
@@ -679,10 +736,10 @@ const InteractiveCalendar = React.forwardRef<HTMLDivElement, CalendarProps>((pro
     return out;
   }, [year, month, selections]);
 
-  const plannedCount = useMemo(
-    () => Object.keys(selections).filter((k) => k.startsWith(`${year}-${month + 1}-`)).length,
-    [selections, year, month],
-  );
+  const plannedCount = useMemo(() => {
+    const prefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
+    return Object.keys(selections).filter((k) => k.startsWith(prefix)).length;
+  }, [selections, year, month]);
 
   const changeMonth = (delta: number) =>
     setCurrentDate((prev) => {
@@ -776,11 +833,15 @@ const InteractiveCalendar = React.forwardRef<HTMLDivElement, CalendarProps>((pro
                   ? 'Dépose-le sur un jour…'
                   : 'Glisse-le sur un jour, puis choisis la matière et la méthode'}
               </p>
-              {plannedCount > 0 && (
+              {loading ? (
+                <span className="ml-auto flex items-center gap-1.5 text-xs text-muted">
+                  <Loader variant="dots" size={14} /> chargement
+                </span>
+              ) : plannedCount > 0 ? (
                 <span className="ml-auto whitespace-nowrap text-xs text-muted">
                   {plannedCount} planifié{plannedCount > 1 ? 's' : ''} ce mois
                 </span>
-              )}
+              ) : null}
             </div>
 
             <div className="grid grid-cols-7 gap-1.5 md:gap-2 lg:gap-3 flex-shrink-0">
@@ -874,10 +935,10 @@ const InteractiveCalendar = React.forwardRef<HTMLDivElement, CalendarProps>((pro
 
         {showCard && selectedDay && (
           <LearningSelectionCard
-            key={selectedDay}
+            key={`${selectedDay}:${currentSelection?.id ?? 'new'}`}
             day={selectedDay}
             monthLabel={monthLabel}
-            workKey={keyFor(year, month, selectedDay)}
+            devoirId={currentSelection?.id ?? ''}
             initial={currentSelection}
             onClose={closeCard}
             onSubmit={saveSelection}

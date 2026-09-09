@@ -1,8 +1,9 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Camera, Check, Copy, LogOut, Pencil, Trash2, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
+import { listDevoirs } from '@/lib/devoirs';
 import { Loader } from '@/components/ui/loader';
 
 const initials = (name: string) =>
@@ -74,13 +75,11 @@ const Profile: React.FC<{ className?: string }> = ({ className = '' }) => {
   const [err, setErr] = useState<string | null>(null);
   const [tagCopied, setTagCopied] = useState(false);
 
-  const activityCount = useMemo(() => {
-    try {
-      const raw = localStorage.getItem('reiim-learning-selections');
-      return raw ? Object.keys(JSON.parse(raw)).length : 0;
-    } catch {
-      return 0;
-    }
+  const [activityCount, setActivityCount] = useState(0);
+  useEffect(() => {
+    void listDevoirs()
+      .then((d) => setActivityCount(d.length))
+      .catch(() => {});
   }, []);
 
   if (!user) return null;
