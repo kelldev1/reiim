@@ -49,14 +49,10 @@ export const SUBJECTS = [
 export const METHODS = [
   { value: 'vidéos', label: 'Vidéos explicatives' },
   { value: 'exercices', label: 'Exercices pratiques' },
-  { value: 'lecture', label: 'Lecture & notes' },
   { value: 'projets', label: 'Projets concrets' },
   { value: 'discussion', label: 'Étude en groupe' },
   { value: 'flashcards', label: 'Flashcards & mémorisation' },
   { value: 'mindmap', label: 'Cartes mentales' },
-  { value: 'podcast', label: 'Podcasts & audio' },
-  { value: 'simulation', label: 'Simulations & labos' },
-  { value: 'lecture_active', label: 'Lecture active & synthèse' },
 ] as const;
 
 const subjectMeta = (v: string) => SUBJECTS.find((s) => s.value === v);

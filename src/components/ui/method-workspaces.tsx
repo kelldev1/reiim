@@ -162,29 +162,6 @@ const TaskList: React.FC<{
   );
 };
 
-const TextList: React.FC<{
-  items: string[];
-  placeholder: string;
-  onChange: (items: string[]) => void;
-}> = ({ items, placeholder, onChange }) => (
-  <div className="flex flex-col gap-2">
-    {items.map((t, i) => (
-      <div key={i} className="flex items-center gap-2">
-        <span className="text-muted">•</span>
-        <input
-          value={t}
-          onChange={(e) => onChange(items.map((x, j) => (j === i ? e.target.value : x)))}
-          className="flex-1 bg-transparent text-sm text-primary outline-none"
-        />
-        <IconBtn label="Supprimer" onClick={() => onChange(items.filter((_, j) => j !== i))}>
-          <X className="h-3.5 w-3.5" />
-        </IconBtn>
-      </div>
-    ))}
-    <AddField placeholder={placeholder} onAdd={(t) => onChange([...items, t])} />
-  </div>
-);
-
 const TagInput: React.FC<{
   tags: string[];
   placeholder: string;
@@ -668,123 +645,6 @@ const MindMapWorkspace: React.FC<{ workKey: string; subject: string; fill?: bool
             );
           })}
         </div>
-      </div>
-    </div>
-  );
-};
-
-/* ---------- Podcasts & audio ---------- */
-
-type AudioItem = { id: string; title: string; url: string; done: boolean; note: string };
-type AudioWork = { items: AudioItem[] };
-
-const AudioWorkspace: React.FC<{ workKey: string }> = ({ workKey }) => {
-  const [d, set] = useWork<AudioWork>(workKey, 'podcast', { items: [] });
-  const patch = (id: string, p: Partial<AudioItem>) =>
-    set((prev) => ({ items: prev.items.map((x) => (x.id === id ? { ...x, ...p } : x)) }));
-  return (
-    <div className="flex flex-col gap-3">
-      <SectionLabel>Ressources audio</SectionLabel>
-      {d.items.map((it) => (
-        <div
-          key={it.id}
-          className="rounded-lg border p-2.5"
-          style={{ borderColor: 'rgb(var(--color-fg) / 0.12)' }}
-        >
-          <div className="flex items-center gap-2">
-            <CheckBox on={it.done} onClick={() => patch(it.id, { done: !it.done })} />
-            <input
-              value={it.title}
-              onChange={(e) => patch(it.id, { title: e.target.value })}
-              placeholder="Titre de l'épisode"
-              className="flex-1 bg-transparent text-sm font-medium text-primary outline-none"
-            />
-            <IconBtn
-              label="Supprimer"
-              onClick={() => set((prev) => ({ items: prev.items.filter((x) => x.id !== it.id) }))}
-            >
-              <X className="h-3.5 w-3.5" />
-            </IconBtn>
-          </div>
-          <input
-            value={it.url}
-            onChange={(e) => patch(it.id, { url: e.target.value })}
-            placeholder="Lien (https://…)"
-            className="mt-1.5 w-full bg-transparent text-xs text-muted outline-none"
-          />
-          {it.url && (
-            <a
-              href={it.url}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-1 inline-block text-xs underline"
-              style={{ color: 'rgb(var(--color-fg) / 0.7)' }}
-            >
-              Ouvrir
-            </a>
-          )}
-          <input
-            value={it.note}
-            onChange={(e) => patch(it.id, { note: e.target.value })}
-            placeholder="Note / minutage"
-            className="mt-1.5 w-full bg-transparent text-xs text-primary outline-none"
-          />
-        </div>
-      ))}
-      <button
-        type="button"
-        onClick={() =>
-          set((prev) => ({
-            items: [...prev.items, { id: uid(), title: '', url: '', done: false, note: '' }],
-          }))
-        }
-        className="rounded-lg border border-dashed py-2 text-xs font-medium text-muted transition-colors hover:text-primary"
-        style={{ borderColor: 'rgb(var(--color-fg) / 0.2)' }}
-      >
-        + Ajouter une ressource
-      </button>
-    </div>
-  );
-};
-
-/* ---------- Lecture active & synthèse ---------- */
-
-type SynthWork = { ideas: string[]; questions: string[]; summary: string };
-
-const SynthesisWorkspace: React.FC<{ workKey: string }> = ({ workKey }) => {
-  const [d, set] = useWork<SynthWork>(workKey, 'lecture_active', {
-    ideas: [],
-    questions: [],
-    summary: '',
-  });
-  return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <SectionLabel>Idées clés</SectionLabel>
-        <TextList
-          items={d.ideas}
-          placeholder="Une idée, puis Entrée"
-          onChange={(ideas) => set((p) => ({ ...p, ideas }))}
-        />
-      </div>
-      <div>
-        <SectionLabel>Questions à creuser</SectionLabel>
-        <TextList
-          items={d.questions}
-          placeholder="Une question, puis Entrée"
-          onChange={(questions) => set((p) => ({ ...p, questions }))}
-        />
-      </div>
-      <div>
-        <SectionLabel>Ma synthèse</SectionLabel>
-        <textarea
-          value={d.summary}
-          onChange={(e) => set((p) => ({ ...p, summary: e.target.value }))}
-          rows={4}
-          placeholder="Reformule le cours avec tes propres mots…"
-          className={`${inputCls} resize-none`}
-          style={inputStyle}
-        />
       </div>
     </div>
   );
@@ -1296,9 +1156,7 @@ const VideoWorkspace: React.FC<{ workKey: string; subject: string; fill?: boolea
 /* ---------- Révision (méthodes sans espace de travail) ---------- */
 
 const METHOD_HINTS: Record<string, string> = {
-  lecture: 'Lis le cours et prends des notes le jour prévu.',
   flashcards: 'Révise avec des flashcards / répétition espacée le jour prévu.',
-  simulation: 'Fais la simulation ou le TP en laboratoire le jour prévu.',
 };
 
 const StudyReminder: React.FC<{ method: string }> = ({ method }) => (
@@ -1333,10 +1191,6 @@ export const MethodWorkspace: React.FC<{
       return <GroupWorkspace workKey={workKey} />;
     case 'mindmap':
       return <MindMapWorkspace workKey={workKey} subject={subject} fill={fill} />;
-    case 'podcast':
-      return <AudioWorkspace workKey={workKey} />;
-    case 'lecture_active':
-      return <SynthesisWorkspace workKey={workKey} />;
     default:
       return <StudyReminder method={method} />;
   }
