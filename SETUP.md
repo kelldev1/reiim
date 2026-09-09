@@ -107,6 +107,35 @@ update public.profiles set credits = 100 where email = 'toi@exemple.com';
 
 ---
 
+## Accès privé — donner un compte à un testeur
+
+reiim est en **accès privé** : l'inscription publique est coupée
+(Supabase → **Authentication → Sign In / Providers** → *Allow new users to sign up* = **OFF**).
+L'écran de connexion n'a plus que « Se connecter ». `signUp()` renverrait une erreur.
+
+**Créer un compte pour quelqu'un :**
+
+1. Supabase → **Authentication → Users** → **Add user** → *Create new user*.
+2. Renseigne son **e-mail** + un **mot de passe** provisoire, coche **Auto Confirm User**
+   (sinon il ne pourra pas se connecter, la confirmation d'e-mail étant désactivée).
+3. Le trigger `handle_new_user` crée sa fiche `profiles` (tag unique + **5 crédits IA**).
+   Son nom = la partie avant le `@` de l'e-mail — il pourra le changer dans **Profil**.
+4. Pour lui donner plus de crédits, **SQL Editor** :
+   ```sql
+   update public.profiles set credits = 100 where email = 'testeur@exemple.com';
+   ```
+5. Donne-lui l'URL + e-mail + mot de passe. Il se connecte, va dans **Profil** pour
+   changer son mot de passe / son nom.
+
+**Retirer l'accès :** Authentication → Users → … → **Delete user** (supprime en cascade
+ses devoirs, son contenu, ses amitiés).
+
+**Rouvrir l'inscription publique un jour :** rebascule le toggle sur ON — et remets
+l'onglet « Créer un compte » dans `src/components/ui/auth-screen.tsx` (voir l'historique
+git, commit qui l'a retiré). Avant ça : hCaptcha + réactiver « Confirm email ».
+
+---
+
 ## Réglages utiles
 
 | Quoi | Où |
