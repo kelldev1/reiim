@@ -87,27 +87,36 @@ export async function moveDevoir(id: string, date: string): Promise<void> {
 
 /* ---------- contenu des espaces de travail ---------- */
 
+/** Lève en cas d'échec réseau/RLS, pour que l'appelant ne confonde pas
+ *  « le devoir est vide » avec « le chargement a échoué ». */
 export async function loadWork(devoirId: string): Promise<Record<string, unknown>> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('devoir_work')
     .select('slot, data')
     .eq('devoir_id', devoirId);
+  if (error) throw new Error(error.message);
   const out: Record<string, unknown> = {};
   for (const r of data ?? []) out[(r as { slot: string }).slot] = (r as { data: unknown }).data;
   return out;
 }
 
+/** `true` si la sauvegarde a réussi, `false` sinon (l'appelant affiche « non enregistré »). */
 export async function saveWork(
   devoirId: string,
   slot: string,
   data: unknown,
-): Promise<void> {
-  await supabase
+): Promise<boolean> {
+  const { error } = await supabase
     .from('devoir_work')
     .upsert(
       { devoir_id: devoirId, slot, data, updated_at: new Date().toISOString() },
       { onConflict: 'devoir_id,slot' },
     );
+  if (error) {
+    console.error('[reiim] saveWork a échoué', error.message);
+    return false;
+  }
+  return true;
 }
 
 /* ---------- partage ---------- */

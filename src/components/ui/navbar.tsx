@@ -138,41 +138,24 @@ const Navbar: React.FC<NavbarProps> = ({
             aria-label={theme === 'dark' ? 'Passer au thème clair' : 'Passer au thème sombre'}
             className="flex h-10 w-28 items-center justify-between px-3 rounded-full ui-chip hover:ui-soft-fill-strong transition-colors"
           >
-            <AnimatePresence mode="wait" initial={false}>
+            {/* swap direct (pas d'AnimatePresence mode="wait" : gèle sous
+                « réduire les animations ») — enter-only fade via la key */}
+            <motion.span
+              key={theme}
+              initial={{ opacity: 0, scale: 0.7 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.18 }}
+              className="flex items-center justify-center"
+            >
               {theme === 'dark' ? (
-                <>
-                  <motion.span
-                    key="sun"
-                    initial={{ opacity: 0, rotate: -40, scale: 0.6 }}
-                    animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                    exit={{ opacity: 0, rotate: 40, scale: 0.6 }}
-                    transition={{ duration: 0.2 }}
-                    className="flex items-center justify-center"
-                  >
-                    <Sun className="h-4 w-4 text-amber-400" />
-                  </motion.span>
-                  <span className="text-sm font-medium text-primary">
-                    Clair
-                  </span>
-                </>
+                <Sun className="h-4 w-4 text-amber-400" />
               ) : (
-                <>
-                  <motion.span
-                    key="moon"
-                    initial={{ opacity: 0, rotate: 40, scale: 0.6 }}
-                    animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                    exit={{ opacity: 0, rotate: -40, scale: 0.6 }}
-                    transition={{ duration: 0.2 }}
-                    className="flex items-center justify-center"
-                  >
-                    <Moon className="h-4 w-4 text-primary" />
-                  </motion.span>
-                  <span className="text-sm font-medium text-primary">
-                    Sombre
-                  </span>
-                </>
+                <Moon className="h-4 w-4 text-primary" />
               )}
-            </AnimatePresence>
+            </motion.span>
+            <span className="text-sm font-medium text-primary">
+              {theme === 'dark' ? 'Clair' : 'Sombre'}
+            </span>
           </motion.button>
 
           <div className="md:hidden">

@@ -437,6 +437,14 @@ export default function AuraBackground(props: AuraBackgroundProps) {
     let lastTime = performance.now();
     let currentShaderStyle = propsRef.current.shaderStyle ?? 'nebula';
 
+    // « Réduire les animations » : le fond reste (identité visuelle) mais on
+    // plafonne à ~30 img/s pour la batterie. La dérive est déjà très lente
+    // (speed 0.3) donc pas de coupe franche du mouvement — cf. recommandation
+    // audit : proposer un vrai réglage « fond statique » dans les préférences.
+    const reduceMotion =
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const minFrameGap = reduceMotion ? 1 / 30 : 0;
+
     const resizeObserver = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
       if (width === 0 || height === 0) return;
@@ -458,6 +466,7 @@ export default function AuraBackground(props: AuraBackgroundProps) {
       if (!isIntersecting) return;
 
       const delta = (time - lastTime) / 1000;
+      if (delta < minFrameGap) return; // plafonne le framerate en mode réduit
       lastTime = time;
 
       if (delta < 0.1) {

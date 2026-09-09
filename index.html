@@ -1,10 +1,43 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>reiim</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <title>reiim — planifie et fais tes devoirs en avance</title>
+    <meta
+      name="description"
+      content="reiim aide les élèves du collège et du lycée à prendre de l'avance : un calendrier pour planifier chaque devoir et des espaces de travail par méthode (exercices, vidéos, cartes mentales, flashcards) avec assistance IA."
+    />
+    <meta name="theme-color" content="#05030d" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="reiim" />
+    <meta property="og:title" content="reiim — planifie et fais tes devoirs en avance" />
+    <meta
+      property="og:description"
+      content="Un calendrier pour planifier chaque devoir et des espaces de travail par méthode avec assistance IA."
+    />
+    <meta name="twitter:card" content="summary" />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- Applique le thème AVANT le premier rendu : évite le flash blanc/noir.
+         Doit rester synchrone avec src/lib/theme.tsx (getInitialTheme). -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('reiim-theme');
+          if (t !== 'dark' && t !== 'light') {
+            t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+          }
+          document.documentElement.classList.add(t);
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

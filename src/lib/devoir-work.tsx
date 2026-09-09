@@ -6,8 +6,14 @@ import { supabase } from '@/lib/supabase';
 // carte s'ouvre, sauvegardé (débounce) à chaque modification. Une entrée par
 // "slot" (méthode). Le hook useWork lit/écrit via ce contexte.
 
+/** État de synchronisation du contenu avec le serveur. */
+export type WorkSyncState = 'idle' | 'saving' | 'saved' | 'error';
+
 type WorkCtx = {
   ready: boolean;
+  /** true si le contenu n'a pas pu être chargé (⇒ ne pas écraser en base). */
+  loadFailed: boolean;
+  sync: WorkSyncState;
   get: (slot: string) => unknown;
   set: (slot: string, data: unknown) => void;
 };
@@ -22,6 +28,8 @@ export const DevoirWorkProvider: React.FC<{
 }> = ({ devoirId, children }) => {
   const [work, setWork] = useState<Record<string, unknown>>({});
   const [ready, setReady] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [sync, setSync] = useState<WorkSyncState>('idle');
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const latest = useRef<Record<string, unknown>>({});
 
@@ -29,16 +37,27 @@ export const DevoirWorkProvider: React.FC<{
     let alive = true;
     setWork({});
     latest.current = {};
+    setLoadFailed(false);
+    setSync('idle');
     if (!devoirId) {
       setReady(true); // devoir pas encore créé — rien à charger
       return;
     }
     setReady(false);
-    void loadWork(devoirId).then((w) => {
-      if (!alive) return;
-      setWork(w);
-      setReady(true);
-    });
+    void loadWork(devoirId)
+      .then((w) => {
+        if (!alive) return;
+        setWork(w);
+        setReady(true);
+      })
+      .catch(() => {
+        if (!alive) return;
+        // On débloque l'UI mais on interdit l'écrasement en base : le contenu
+        // affiché est vide alors qu'il ne l'est peut-être pas.
+        setLoadFailed(true);
+        setReady(true);
+        setSync('error');
+      });
     return () => {
       alive = false;
     };
@@ -49,13 +68,15 @@ export const DevoirWorkProvider: React.FC<{
     const t = timers.current;
     const l = latest.current;
     const id = devoirId;
+    const failed = loadFailed;
     return () => {
+      if (failed) return; // chargement KO → ne pas écraser en base
       for (const slot of Object.keys(t)) {
         clearTimeout(t[slot]);
         if (slot in l) void saveWork(id, slot, l[slot]);
       }
     };
-  }, [devoirId]);
+  }, [devoirId, loadFailed]);
 
   // temps réel : reflète les modifications faites par un autre membre du devoir
   useEffect(() => {
@@ -88,15 +109,24 @@ export const DevoirWorkProvider: React.FC<{
   const set = (slot: string, data: unknown) => {
     latest.current[slot] = data;
     setWork((prev) => ({ ...prev, [slot]: data }));
+    if (loadFailed) {
+      setSync('error');
+      return; // contenu non chargé → on n'écrit pas par-dessus
+    }
     if (!devoirId) return; // sera repris quand le devoir aura un id (remontage)
+    setSync('saving');
     clearTimeout(timers.current[slot]);
     timers.current[slot] = setTimeout(() => {
-      void saveWork(devoirId, slot, latest.current[slot]);
+      void saveWork(devoirId, slot, latest.current[slot]).then((ok) => {
+        setSync(ok ? 'saved' : 'error');
+      });
     }, SAVE_DEBOUNCE_MS);
   };
 
   return (
-    <Ctx.Provider value={{ ready, get: (s) => work[s], set }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ ready, loadFailed, sync, get: (s) => work[s], set }}>
+      {children}
+    </Ctx.Provider>
   );
 };
 
@@ -107,6 +137,7 @@ export const DevoirWorkProvider: React.FC<{
 export function useWork<T>(_workKey: string, slot: string, initial: T) {
   const ctx = useContext(Ctx);
   const [data, setData] = useState<T>(initial);
+  const dataRef = useRef<T>(initial);
   const touched = useRef(false);
   const initialRef = useRef(initial);
 
@@ -117,17 +148,21 @@ export function useWork<T>(_workKey: string, slot: string, initial: T) {
   // (Une fois « touché », l'utilisateur possède ce champ pour la session.)
   useEffect(() => {
     if (ctx?.ready && !touched.current) {
-      setData(serverVal === undefined ? initialRef.current : (serverVal as T));
+      const v = serverVal === undefined ? initialRef.current : (serverVal as T);
+      dataRef.current = v;
+      setData(v);
     }
   }, [ctx?.ready, serverVal]);
 
   const update = (next: T | ((prev: T) => T)) => {
     touched.current = true;
-    setData((prev) => {
-      const value = typeof next === 'function' ? (next as (p: T) => T)(prev) : next;
-      ctx?.set(slot, value);
-      return value;
-    });
+    const value =
+      typeof next === 'function' ? (next as (p: T) => T)(dataRef.current) : next;
+    dataRef.current = value;
+    setData(value);
+    // Hors du updater de setData : sinon on déclenche un setState du provider
+    // pendant le rendu d'un autre composant (« Cannot update a component… »).
+    ctx?.set(slot, value);
   };
 
   return [data, update] as const;
@@ -137,4 +172,10 @@ export function useWork<T>(_workKey: string, slot: string, initial: T) {
 export function useWorkLoading(): boolean {
   const ctx = useContext(Ctx);
   return ctx ? !ctx.ready : false;
+}
+
+/** État de synchronisation ('idle' | 'saving' | 'saved' | 'error') + échec de chargement. */
+export function useWorkSync(): { state: WorkSyncState; loadFailed: boolean } {
+  const ctx = useContext(Ctx);
+  return { state: ctx?.sync ?? 'idle', loadFailed: ctx?.loadFailed ?? false };
 }

@@ -2,7 +2,7 @@ import React, { useCallback, useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { LayoutDashboard, LayoutGrid, GripVertical, LogOut, Trash2, UserPlus } from 'lucide-react';
 import { MethodWorkspace } from '@/components/ui/method-workspaces';
-import { DevoirWorkProvider } from '@/lib/devoir-work';
+import { DevoirWorkProvider, useWorkSync } from '@/lib/devoir-work';
 import {
   deleteDevoir,
   inviteToDevoir,
@@ -427,6 +427,29 @@ const MembersBar: React.FC<{
   );
 };
 
+/** Indicateur discret de sauvegarde du contenu (rien quand tout va bien). */
+const SyncStatus: React.FC = () => {
+  const { state, loadFailed } = useWorkSync();
+  if (loadFailed) {
+    return (
+      <p className="text-xs font-medium" style={{ color: 'rgb(239 68 68)' }}>
+        Contenu non chargé — recharge la page avant d'éditer (rien n'est écrasé).
+      </p>
+    );
+  }
+  if (state === 'error') {
+    return (
+      <p className="text-xs font-medium" style={{ color: 'rgb(239 68 68)' }}>
+        ⚠ Modifications non enregistrées — vérifie ta connexion.
+      </p>
+    );
+  }
+  if (state === 'saving') {
+    return <p className="text-xs text-muted-soft">Enregistrement…</p>;
+  }
+  return null;
+};
+
 const LearningSelectionCard: React.FC<{
   day: string;
   monthLabel: string;
@@ -674,6 +697,7 @@ const LearningSelectionCard: React.FC<{
           ) : (
             <DevoirWorkProvider devoirId={devoirId}>
               <MembersBar devoirId={devoirId} isOwner={!shared} ownerHandle={initial?.ownerHandle} />
+              <SyncStatus />
               {!bigMode && (
                 <div
                   className="flex items-start justify-between gap-3 rounded-xl p-3"
@@ -788,6 +812,11 @@ const InteractiveCalendar = React.forwardRef<HTMLDivElement, CalendarProps>((pro
   const [selections, setSelections] = useState<Selections>({});
   const [loading, setLoading] = useState(true);
   const [dragActive, setDragActive] = useState(false);
+  const [banner, setBanner] = useState<string | null>(null);
+  const flash = useCallback((msg: string) => {
+    setBanner(msg);
+    window.setTimeout(() => setBanner((b) => (b === msg ? null : b)), 4000);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -850,12 +879,17 @@ const InteractiveCalendar = React.forwardRef<HTMLDivElement, CalendarProps>((pro
       delete next[iso];
       return next;
     });
-    // devoir partagé → on quitte ; devoir à soi → on supprime
-    if (sel.shared && user) {
-      void removeDevoirMember(sel.id, user.id).catch(() => {});
-    } else {
-      void deleteDevoir(sel.id).catch(() => {});
-    }
+    // devoir partagé → on quitte ; devoir à soi → on supprime.
+    // En cas d'échec serveur : on remet la sélection et on prévient.
+    const op =
+      sel.shared && user
+        ? removeDevoirMember(sel.id, user.id)
+        : deleteDevoir(sel.id);
+    void op.catch((e) => {
+      console.error('[reiim] suppression du devoir a échoué', e);
+      setSelections((prev) => ({ ...prev, [iso]: sel }));
+      flash("La suppression a échoué — réessaie.");
+    });
   };
 
   const moveSelection = (from: string, to: string) => {
@@ -878,6 +912,7 @@ const InteractiveCalendar = React.forwardRef<HTMLDivElement, CalendarProps>((pro
         next[fromKey] = moving;
         return next;
       });
+      flash("Le déplacement a échoué — réessaie.");
     });
   };
 
@@ -934,6 +969,19 @@ const InteractiveCalendar = React.forwardRef<HTMLDivElement, CalendarProps>((pro
         className={`relative w-full h-full flex flex-col lg:flex-row items-stretch gap-4 lg:gap-8 p-3 md:p-6 lg:p-8 ${className ?? ''}`}
         {...restProps}
       >
+        {banner && (
+          <div
+            role="alert"
+            className="fixed left-1/2 top-4 z-[60] -translate-x-1/2 rounded-lg border px-4 py-2 text-sm font-medium shadow-lg"
+            style={{
+              backgroundColor: 'rgb(var(--color-surface))',
+              borderColor: 'rgb(239 68 68 / 0.4)',
+              color: 'rgb(239 68 68)',
+            }}
+          >
+            {banner}
+          </div>
+        )}
         <motion.div
           layout
           className="w-full lg:flex-1 lg:max-w-none min-w-0 min-h-0 flex flex-col gap-4 lg:gap-6 flex-shrink-0"

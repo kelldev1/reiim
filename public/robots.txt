@@ -1,0 +1,4 @@
+# reiim — application en accès privé, rien à indexer pour l'instant.
+# À rouvrir quand une page d'accueil publique existera.
+User-agent: *
+Disallow: /
