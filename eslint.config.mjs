@@ -11,6 +11,7 @@ export default tseslint.config(
     ignores: [
       'dist',
       'node_modules',
+      'public/**',
       'supabase/functions/**',
       '**/*.bak',
       '**/*.current-backup',

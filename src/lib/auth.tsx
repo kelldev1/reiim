@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { setUserContext } from '@/lib/monitoring';
 
 export interface User {
   id: string;
@@ -76,6 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   const loadProfile = async (session: Session | null) => {
+    setUserContext(session?.user?.id ?? null);
     if (!session?.user) {
       setUser(null);
       return;

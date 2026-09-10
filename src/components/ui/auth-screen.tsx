@@ -106,6 +106,12 @@ export default function AuthScreen() {
         <p className="mt-5 text-center text-xs text-muted-soft">
           reiim est en accès privé. Demande un accès à la personne qui t'a partagé le lien.
         </p>
+
+        <nav className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-1 text-[11px] text-muted-soft">
+          <a href="/mentions-legales.html" className="hover:text-primary">Mentions légales</a>
+          <a href="/confidentialite.html" className="hover:text-primary">Confidentialité</a>
+          <a href="/cgv.html" className="hover:text-primary">CGU / CGV</a>
+        </nav>
       </motion.div>
     </motion.div>
   );

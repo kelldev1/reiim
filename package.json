@@ -14,6 +14,7 @@
     "check": "npm run typecheck && npm run lint"
   },
   "dependencies": {
+    "@sentry/react": "^10.74.0",
     "@supabase/supabase-js": "^2.115.0",
     "@types/three": "^0.185.4",
     "framer-motion": "^10.16.4",

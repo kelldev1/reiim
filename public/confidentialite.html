@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Politique de confidentialité — reiim</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/legal.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header><a class="brand" href="/">reiim</a></header>
+
+      <h1>Politique de confidentialité</h1>
+      <p class="muted">Dernière mise à jour : <span class="todo">[À COMPLÉTER : date]</span></p>
+
+      <p>
+        reiim (« nous ») aide des élèves du collège et du lycée à planifier et préparer leurs
+        devoirs. Cette page explique quelles données nous traitons, pourquoi, et vos droits.
+      </p>
+
+      <h2>1. Responsable du traitement</h2>
+      <p>
+        <span class="todo">[À COMPLÉTER : nom / raison sociale de l'éditeur]</span>,
+        <span class="todo">[adresse]</span>. Contact :
+        <span class="todo">[email de contact / DPO]</span>.
+      </p>
+
+      <h2>2. Données que nous traitons</h2>
+      <table>
+        <tr><th>Donnée</th><th>Pourquoi</th><th>Base légale</th></tr>
+        <tr><td>E-mail, mot de passe (haché)</td><td>Créer et sécuriser votre compte</td><td>Exécution du contrat</td></tr>
+        <tr><td>Nom d'affichage, identifiant public (Pseudo#TAG), photo de profil (optionnelle), bio (optionnelle)</td><td>Votre profil et le système d'amis</td><td>Exécution du contrat</td></tr>
+        <tr><td>Devoirs planifiés (matière, date, méthodes) et le contenu de vos espaces de travail (notes, cartes mentales, flashcards, énoncés collés ou PDF importés, réponses générées)</td><td>Fournir le service</td><td>Exécution du contrat</td></tr>
+        <tr><td>Liste d'amis, invitations, devoirs partagés</td><td>Fonction de partage entre élèves</td><td>Exécution du contrat</td></tr>
+        <tr><td>Journal d'utilisation de l'assistant IA (fonction appelée, nombre de jetons, date) et solde de crédits</td><td>Facturation, limitation d'abus, statistiques</td><td>Exécution du contrat / intérêt légitime</td></tr>
+        <tr><td>Données de paiement</td><td>Achat de crédits — traitées par notre prestataire de paiement, <span class="todo">[Lemon Squeezy]</span>. Nous ne stockons aucune donnée de carte.</td><td>Exécution du contrat</td></tr>
+        <tr><td>Rapports d'erreur techniques (si le monitoring est activé) : type d'erreur, page, identifiant de compte, navigateur</td><td>Corriger les bugs</td><td>Intérêt légitime</td></tr>
+      </table>
+      <p>
+        Nous <strong>n'utilisons pas de cookies publicitaires ni de traceurs tiers</strong>.
+        Le navigateur conserve seulement un jeton de session et quelques préférences locales
+        (thème, brouillons) nécessaires au fonctionnement.
+      </p>
+
+      <h2>3. Où sont hébergées vos données</h2>
+      <p>
+        La base de données et l'authentification sont hébergées par <strong>Supabase</strong>
+        dans l'Union européenne (région Paris, <code>eu-west-3</code>).
+      </p>
+
+      <h2>4. Sous-traitants et transferts</h2>
+      <ul>
+        <li>
+          <strong>Anthropic (Claude)</strong> — États-Unis. Lorsque vous utilisez l'assistant IA
+          (résolution d'exercice, génération de carte mentale ou de flashcards), le contenu que
+          vous soumettez (énoncé, PDF, sujet) est envoyé à Anthropic pour produire la réponse.
+          Ce transfert hors UE est encadré par des clauses contractuelles types.
+          <span class="todo">[À COMPLÉTER : signer / référencer le DPA Anthropic]</span>
+        </li>
+        <li>
+          <strong>YouTube / Google (API Data v3)</strong> — lorsque vous recherchez une vidéo,
+          votre requête est transmise à l'API YouTube. Les lecteurs vidéo utilisent le mode
+          « youtube-nocookie ».
+        </li>
+        <li>
+          <strong><span class="todo">[Lemon Squeezy]</span></strong> — prestataire de paiement,
+          agit comme <em>merchant of record</em> et traite la transaction et la TVA.
+        </li>
+        <li>
+          <strong><span class="todo">[Sentry / autre]</span></strong> — monitoring d'erreurs,
+          uniquement si activé.
+        </li>
+      </ul>
+
+      <h2>5. Durée de conservation</h2>
+      <p>
+        Vos données sont conservées tant que votre compte existe. À la suppression du compte,
+        elles sont effacées (en cascade : devoirs, contenu, amitiés). Les journaux de facturation
+        peuvent être conservés jusqu'à <span class="todo">[À COMPLÉTER : ex. 10 ans]</span> pour
+        respecter nos obligations comptables.
+      </p>
+
+      <h2>6. Vos droits</h2>
+      <p>
+        Vous disposez d'un droit d'accès, de rectification, d'effacement, de limitation, de
+        portabilité et d'opposition. Vous pouvez modifier votre profil dans l'application, et
+        demander la suppression de votre compte en écrivant à
+        <span class="todo">[email de contact]</span>. Vous pouvez aussi réclamer auprès de la
+        CNIL (<a href="https://www.cnil.fr" rel="noreferrer">cnil.fr</a>).
+      </p>
+
+      <h2>7. Utilisateurs mineurs</h2>
+      <p>
+        <span class="todo">
+          [À DÉCIDER — proposition : le service est ouvert aux personnes de 15 ans et plus. En
+          dessous de 15 ans, la création du compte doit être faite ou autorisée par un
+          représentant légal, conformément au RGPD (art. 8) et à la loi française.]
+        </span>
+      </p>
+
+      <h2>8. Sécurité</h2>
+      <p>
+        Les accès aux données sont cloisonnés par utilisateur au niveau de la base
+        (Row Level Security). Les clés des services tiers ne sont jamais exposées dans le
+        navigateur. Les échanges se font en HTTPS.
+      </p>
+
+      <div class="nav">
+        <a href="/mentions-legales.html">Mentions légales</a>
+        <a href="/cgv.html">Conditions générales</a>
+        <a href="/">Retour à l'application</a>
+      </div>
+    </div>
+  </body>
+</html>

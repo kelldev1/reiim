@@ -7,3 +7,8 @@ verify_jwt = true
 
 [functions.videos]
 verify_jwt = true
+
+# Webhook Lemon Squeezy : appelé par Lemon Squeezy (pas de JWT Supabase).
+# La sécurité vient de la signature HMAC vérifiée dans la fonction.
+[functions.lemon-webhook]
+verify_jwt = false

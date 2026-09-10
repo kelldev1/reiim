@@ -19,7 +19,6 @@ export class ErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    // eslint-disable-next-line no-console
     console.error('[reiim] erreur de rendu', error, info.componentStack);
     this.props.onError?.(error, info);
   }

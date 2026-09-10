@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Camera, Check, Copy, LogOut, Pencil, Trash2, X } from 'lucide-react';
+import { Camera, Check, Copy, LogOut, Pencil, Sparkles, Trash2, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { listDevoirs } from '@/lib/devoirs';
+import { CREDIT_PACKS, billingEnabled, checkoutUrl } from '@/lib/billing';
 import { Loader } from '@/components/ui/loader';
 
 const initials = (name: string) =>
@@ -307,6 +308,37 @@ const Profile: React.FC<{ className?: string }> = ({ className = '' }) => {
           <Stat value={memberSince} label="Membre depuis" />
         </div>
 
+        {billingEnabled && (
+          <div className="mt-6 flex flex-col gap-3 rounded-2xl ui-card p-5">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <h2 className="text-lg font-semibold text-primary">Recharger des crédits</h2>
+            </div>
+            <p className="text-xs text-muted">
+              1 crédit = 1 devoir résolu par l'assistant. Vidéos, cartes mentales et flashcards
+              restent gratuites.
+            </p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {CREDIT_PACKS.map((pack) => (
+                <a
+                  key={pack.credits}
+                  href={checkoutUrl(pack, user.id, user.email)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex flex-col items-center rounded-xl border py-3 text-center transition-colors hover:opacity-90"
+                  style={{ borderColor: 'rgb(var(--color-fg) / 0.15)' }}
+                >
+                  <span className="text-lg font-bold text-primary">{pack.credits}</span>
+                  <span className="text-[11px] text-muted">crédits</span>
+                </a>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-soft">
+              Paiement sécurisé via Lemon Squeezy. Les crédits arrivent en quelques secondes.
+            </p>
+          </div>
+        )}
+
         {/* preferences */}
         <div className="mt-6 flex flex-col gap-4 rounded-2xl ui-card p-5">
           <h2 className="text-lg font-semibold text-primary">Préférences</h2>
@@ -349,6 +381,18 @@ const Profile: React.FC<{ className?: string }> = ({ className = '' }) => {
         >
           <LogOut className="h-4 w-4" /> Se déconnecter
         </button>
+
+        <nav className="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-1 text-[11px] text-muted-soft">
+          <a href="/mentions-legales.html" target="_blank" rel="noreferrer" className="hover:text-primary">
+            Mentions légales
+          </a>
+          <a href="/confidentialite.html" target="_blank" rel="noreferrer" className="hover:text-primary">
+            Confidentialité
+          </a>
+          <a href="/cgv.html" target="_blank" rel="noreferrer" className="hover:text-primary">
+            CGU / CGV
+          </a>
+        </nav>
       </div>
     </div>
   );

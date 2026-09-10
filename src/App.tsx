@@ -52,10 +52,23 @@ function AppShell() {
 function Root() {
   const { theme } = useTheme();
   const background = useBackground();
-  const { user, loading } = useAuth();
+  const { user, loading, refreshProfile } = useAuth();
 
   const [booting, setBooting] = useState(true);
   const wasAuthed = useRef(false);
+
+  // Retour de paiement (Lemon Squeezy redirige vers /?merci=1) : on rafraîchit
+  // le solde de crédits et on nettoie l'URL.
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.has('merci')) {
+      const bump = () => void refreshProfile();
+      bump();
+      const t = window.setTimeout(bump, 4000); // laisse le temps au webhook
+      window.history.replaceState({}, '', window.location.pathname);
+      return () => window.clearTimeout(t);
+    }
+  }, [refreshProfile]);
 
   // Boot loader on every app open.
   useEffect(() => {
