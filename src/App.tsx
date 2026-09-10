@@ -118,6 +118,14 @@ function Root() {
         color4={background.background.color4}
       />
 
+      {/* Léger flou sur le fond animé : adoucit sans le figer. Le contenu
+          (z-10) passe au-dessus de ce calque, donc il reste net. */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-[1] backdrop-blur-[3px]"
+        style={{ backgroundColor: 'rgb(var(--color-bg) / 0.04)' }}
+      />
+
       <div className="relative z-10 flex flex-col h-full w-full">
         {showLoader ? (
           <BootScreen />
