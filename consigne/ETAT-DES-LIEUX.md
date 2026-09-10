@@ -19,10 +19,18 @@ cette session (commits `7535d8b` → `1c3b459`) :
   40/j/user — protège le quota YouTube partagé). Fonctions redéployées.
 - **Hygiène** : `npm run lint` réparé (0 erreur) ; squelette .NET mort supprimé ; README réécrit.
 
-**Décisions en attente** (ne pas inventer) : prestataire de paiement + modèle ; contenu des
-pages légales (mentions, CGV, confidentialité — élèves potentiellement mineurs !) ; RGPD /
-bandeau cookies ; monitoring (Sentry ?) ; hébergeur + domaine ; SMTP custom Supabase ;
-**régénérer la clé API Anthropic** (collée en clair dans une conversation).
+### Les 4 blocages — la PARTIE CODE est faite (commit `01c7caf`), reste la config
+
+Tout est branché derrière des variables d'env / secrets — l'app fonctionne sans (dev), et
+s'active quand tu remplis. **Marche à suivre complète : `DEPLOY.md`.**
+
+| Blocage | Code | Il te reste |
+|---|---|---|
+| **Déploiement** | `vercel.json` (SPA + CSP + HSTS + tous les en-têtes) ✓ | créer le projet Vercel, brancher un domaine, mettre `ALLOWED_ORIGINS` |
+| **Monitoring** | Sentry en import dynamique conditionnel (`VITE_SENTRY_DSN`) ✓ | créer le projet Sentry, coller le DSN dans Vercel |
+| **Paiement** | Lemon Squeezy : migration `credit_purchases` + `add_ai_credits()` idempotente (lancées) + fonction `lemon-webhook` (déployée) + bloc « Recharger » dans le profil ✓ | créer la boutique LS + 3 packs, mettre les secrets (`LEMON_*`) + URLs de checkout |
+| **Pages légales** | `public/{mentions-legales,cgv,confidentialite}.html` + liens dans l'app ✓ | remplir les `[À COMPLÉTER]` (identité éditeur, SIRET, médiateur), **décider l'âge min. / mineurs**, faire relire |
+| **Clé Anthropic** | — | **la régénérer** sur console.anthropic.com et refaire `supabase secrets set LLM_API_KEY` |
 
 ## Projet Supabase (réel, en place)
 
