@@ -65,13 +65,10 @@ const keyFor = (year: number, month: number, day: string) =>
 const toSelections = (devoirs: Devoir[]): Selections => {
   const out: Selections = {};
   for (const d of devoirs) {
-    out[d.date] = {
-      id: d.id,
-      subject: d.subject,
-      methods: d.methods,
-      shared: d.shared,
-      ownerHandle: d.ownerHandle,
-    };
+    // Les devoirs partagés s'affichent dans leur propre liste (« Partagés avec toi »),
+    // pas dans la grille : un jour peut déjà porter mon propre devoir.
+    if (d.shared) continue;
+    out[d.date] = { id: d.id, subject: d.subject, methods: d.methods };
   }
   return out;
 };
@@ -810,6 +807,8 @@ const InteractiveCalendar = React.forwardRef<HTMLDivElement, CalendarProps>((pro
   const [showCard, setShowCard] = useState(false);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selections, setSelections] = useState<Selections>({});
+  const [shared, setShared] = useState<Devoir[]>([]);
+  const [sharedCard, setSharedCard] = useState<Devoir | null>(null);
   const [loading, setLoading] = useState(true);
   const [dragActive, setDragActive] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
@@ -824,7 +823,10 @@ const InteractiveCalendar = React.forwardRef<HTMLDivElement, CalendarProps>((pro
       await importLegacyDevoirs();
       try {
         const devoirs = await listDevoirs();
-        if (alive) setSelections(toSelections(devoirs));
+        if (alive) {
+          setSelections(toSelections(devoirs));
+          setShared(devoirs.filter((d) => d.shared));
+        }
       } catch {
         /* affiche un calendrier vide plutôt que de crasher */
       }
@@ -1068,6 +1070,39 @@ const InteractiveCalendar = React.forwardRef<HTMLDivElement, CalendarProps>((pro
               ) : null}
             </div>
 
+            {shared.length > 0 && (
+              <div className="flex flex-shrink-0 flex-col gap-1.5">
+                <p className="text-xs font-semibold text-muted">Partagés avec toi</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {shared.map((d) => {
+                    const s = subjectMeta(d.subject);
+                    return (
+                      <button
+                        key={d.id}
+                        onClick={() => setSharedCard(d)}
+                        className="flex items-center gap-1.5 rounded-lg ui-chip border px-2 py-1 text-xs transition-colors hover:ui-soft-fill-strong"
+                      >
+                        <span
+                          className="h-1.5 w-1.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: s?.color ?? '#888888' }}
+                        />
+                        <span className="font-medium text-primary">{s?.label ?? d.subject}</span>
+                        <span className="text-muted">
+                          {new Intl.DateTimeFormat('fr-FR', {
+                            day: 'numeric',
+                            month: 'short',
+                          }).format(new Date(`${d.date}T00:00`))}
+                        </span>
+                        {d.ownerHandle && (
+                          <span className="text-muted-soft">· {d.ownerHandle}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-7 gap-1.5 md:gap-2 lg:gap-3 flex-shrink-0">
               {daysOfWeek.map((d) => (
                 <div
@@ -1167,6 +1202,37 @@ const InteractiveCalendar = React.forwardRef<HTMLDivElement, CalendarProps>((pro
             onClose={closeCard}
             onSubmit={saveSelection}
             onDelete={deleteSelection}
+          />
+        )}
+
+        {sharedCard && (
+          <LearningSelectionCard
+            key={`shared:${sharedCard.id}`}
+            day={sharedCard.date.slice(8, 10)}
+            monthLabel={new Intl.DateTimeFormat('fr-FR', {
+              month: 'long',
+              year: 'numeric',
+            }).format(new Date(`${sharedCard.date}T00:00`))}
+            devoirId={sharedCard.id}
+            initial={{
+              id: sharedCard.id,
+              subject: sharedCard.subject,
+              methods: sharedCard.methods,
+              shared: true,
+              ownerHandle: sharedCard.ownerHandle,
+            }}
+            onClose={() => setSharedCard(null)}
+            onSubmit={async () => false}
+            onDelete={() => {
+              const d = sharedCard;
+              setSharedCard(null);
+              setShared((prev) => prev.filter((x) => x.id !== d.id));
+              if (user)
+                void removeDevoirMember(d.id, user.id).catch(() => {
+                  setShared((prev) => [...prev, d]);
+                  flash('Impossible de quitter ce devoir — réessaie.');
+                });
+            }}
           />
         )}
       </motion.div>

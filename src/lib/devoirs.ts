@@ -22,13 +22,23 @@ const toDevoir = (r: Row): Devoir => ({
 
 /** Mes devoirs + ceux partagés avec moi (le volume reste petit). */
 export async function listDevoirs(): Promise<Devoir[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const [own, shared] = await Promise.all([
-    supabase.from('devoirs').select('id, d, subject, methods').order('d'),
+    // `owner_id = moi` explicitement : la RLS « propriétaire OU membre » ferait
+    // aussi remonter les devoirs partagés ici, sans le drapeau `shared`.
+    user
+      ? supabase
+          .from('devoirs')
+          .select('id, d, subject, methods')
+          .eq('owner_id', user.id)
+          .order('d')
+      : Promise.resolve({ data: [] as Row[], error: null }),
     supabase.rpc('list_shared_devoirs'),
   ]);
   if (own.error) throw new Error(own.error.message);
   const owned = (own.data ?? []).map((r) => toDevoir(r as Row));
-  const ownedDates = new Set(owned.map((d) => d.date));
   const sharedDevoirs: Devoir[] = (
     (shared.data ?? []) as {
       id: string;
@@ -38,17 +48,14 @@ export async function listDevoirs(): Promise<Devoir[]> {
       owner_name: string;
       owner_tag: string;
     }[]
-  )
-    .map((r) => ({
-      id: r.id,
-      date: r.d,
-      subject: r.subject,
-      methods: r.methods ?? [],
-      shared: true,
-      ownerHandle: `${r.owner_name}#${r.owner_tag}`,
-    }))
-    // pas de collision : si j'ai déjà un devoir ce jour-là, le mien passe d'abord
-    .filter((d) => !ownedDates.has(d.date));
+  ).map((r) => ({
+    id: r.id,
+    date: r.d,
+    subject: r.subject,
+    methods: r.methods ?? [],
+    shared: true,
+    ownerHandle: `${r.owner_name}#${r.owner_tag}`,
+  }));
   return [...owned, ...sharedDevoirs];
 }
 
