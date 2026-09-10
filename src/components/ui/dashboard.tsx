@@ -3,12 +3,8 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import {
   CalendarDays,
-  CalendarClock,
   CalendarRange,
-  ClipboardList,
-  Timer,
   BarChart3,
-  Sparkles,
   TrendingUp,
   ChevronRight,
   ArrowRight,
@@ -47,14 +43,13 @@ const KpiCard: React.FC<{
   value: number;
   hint: string;
   accent: Accent;
-  Icon: React.ComponentType<{ className?: string }>;
-}> = ({ label, value, hint, accent, Icon }) => {
-  // Low-opacity utilities read correctly on both the light and dark grounds.
+}> = ({ label, value, hint, accent }) => {
+  // Le halo coloré en fond suffit à distinguer les cartes — pas d'icône.
   const accentCls = {
-    blue: 'from-blue-500/20 to-blue-500/0 text-blue-500 border-blue-500/20',
-    violet: 'from-violet-500/20 to-violet-500/0 text-violet-500 border-violet-500/20',
-    emerald: 'from-emerald-500/20 to-emerald-500/0 text-emerald-500 border-emerald-500/20',
-    amber: 'from-amber-500/20 to-amber-500/0 text-amber-500 border-amber-500/20',
+    blue: 'from-blue-500/20 to-blue-500/0',
+    violet: 'from-violet-500/20 to-violet-500/0',
+    emerald: 'from-emerald-500/20 to-emerald-500/0',
+    amber: 'from-amber-500/20 to-amber-500/0',
   }[accent];
 
   return (
@@ -62,28 +57,16 @@ const KpiCard: React.FC<{
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
-      className="relative flex flex-col gap-4 rounded-2xl ui-card p-4 md:p-5 overflow-hidden"
+      className="relative flex flex-col gap-1.5 rounded-2xl ui-card p-4 md:p-5 overflow-hidden"
     >
       <div
         className={`pointer-events-none absolute -top-10 -right-10 h-40 w-40 rounded-full bg-gradient-to-br blur-3xl ${accentCls}`}
       />
-      <div className="relative flex items-start justify-between">
-        <div
-          className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br border ${accentCls}`}
-        >
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="inline-flex items-center gap-1.5 rounded-full ui-chip px-2.5 py-0.5 text-[10px] font-medium">
-          <div className="h-1.5 w-1.5 rounded-full bg-current opacity-40" />
-          <span>{hint}</span>
-        </div>
-      </div>
-      <div className="relative flex flex-col gap-1">
-        <span className="text-xs md:text-sm font-medium text-muted">{label}</span>
-        <span className="text-3xl md:text-4xl font-bold text-primary tabular-nums tracking-tight">
-          {value.toLocaleString('fr-FR')}
-        </span>
-      </div>
+      <span className="relative text-xs md:text-sm font-medium text-muted">{label}</span>
+      <span className="relative text-3xl md:text-4xl font-bold text-primary tabular-nums tracking-tight">
+        {value.toLocaleString('fr-FR')}
+      </span>
+      <span className="relative text-[11px] text-muted-soft">{hint}</span>
     </motion.div>
   );
 };
@@ -639,28 +622,24 @@ const Dashboard: React.FC<DashboardProps> = ({ onGoToCalendar, className = '' })
                 value={d.list.length}
                 hint="au total"
                 accent="blue"
-                Icon={ClipboardList}
               />
               <KpiCard
                 label="À venir"
                 value={d.upcoming.length}
                 hint="dès aujourd'hui"
                 accent="violet"
-                Icon={CalendarClock}
               />
               <KpiCard
                 label="Cette semaine"
                 value={d.thisWeek.length}
                 hint="7 prochains jours"
                 accent="emerald"
-                Icon={Timer}
               />
               <KpiCard
                 label="Crédits IA"
                 value={user?.credits ?? 0}
                 hint="pour l'assistant"
                 accent="amber"
-                Icon={Sparkles}
               />
             </div>
 
