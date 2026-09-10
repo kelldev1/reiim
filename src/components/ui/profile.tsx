@@ -6,6 +6,7 @@ import { useTheme } from '@/lib/theme';
 import { listDevoirs } from '@/lib/devoirs';
 import { CREDIT_PACKS, billingEnabled, checkoutUrl } from '@/lib/billing';
 import { Loader } from '@/components/ui/loader';
+import InviteManager from '@/components/ui/invite-manager';
 
 const initials = (name: string) =>
   name
@@ -338,6 +339,8 @@ const Profile: React.FC<{ className?: string }> = ({ className = '' }) => {
             </p>
           </div>
         )}
+
+        {user.canInvite && <InviteManager />}
 
         {/* preferences */}
         <div className="mt-6 flex flex-col gap-4 rounded-2xl ui-card p-5">

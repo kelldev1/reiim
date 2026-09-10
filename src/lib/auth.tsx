@@ -15,6 +15,8 @@ export interface User {
   /** Remaining AI credits (managed server-side). */
   credits: number;
   plan: string;
+  /** Autorisé à générer des liens d'invitation (géré côté serveur). */
+  canInvite: boolean;
 }
 
 interface AuthContextValue {
@@ -45,6 +47,7 @@ type ProfileRow = {
   bio: string | null;
   credits: number;
   plan: string;
+  can_invite: boolean | null;
   created_at: string;
 };
 
@@ -58,6 +61,7 @@ const toUser = (row: ProfileRow, session: Session): User => ({
   bio: row.bio ?? undefined,
   credits: row.credits ?? 0,
   plan: row.plan ?? 'free',
+  canInvite: row.can_invite ?? false,
 });
 
 const mapAuthError = (msg: string): string => {
@@ -100,6 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: session.user.created_at,
         credits: 0,
         plan: 'free',
+        canInvite: false,
       });
     }
   };

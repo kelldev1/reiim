@@ -12,3 +12,8 @@ verify_jwt = true
 # La sécurité vient de la signature HMAC vérifiée dans la fonction.
 [functions.lemon-webhook]
 verify_jwt = false
+
+# Échange d'un lien d'invitation : la personne invitée n'a pas encore de session.
+# La sécurité vient du code d'invitation (128 bits) validé par claim_invite().
+[functions.redeem-invite]
+verify_jwt = false

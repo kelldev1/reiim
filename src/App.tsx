@@ -8,12 +8,19 @@ import Friends from '@/components/ui/friends';
 import AuraBackground from '@/components/ui/background';
 import BootScreen from '@/components/ui/boot-screen';
 import AuthScreen from '@/components/ui/auth-screen';
+import InviteScreen from '@/components/ui/invite-screen';
 import { useTheme } from '@/lib/theme';
 import { BackgroundProvider, useBackground } from '@/lib/background';
 import { AuthProvider, useAuth } from '@/lib/auth';
 
 const BOOT_MS = 1800;
 const LOGIN_MS = 1400;
+
+/** Code d'invitation si l'URL est `/invite/<code>`, sinon null. */
+const readInviteCode = (): string | null => {
+  const m = window.location.pathname.match(/^\/invite\/([A-Za-z0-9_-]{16,80})\/?$/);
+  return m ? m[1] : null;
+};
 
 function AppShell() {
   const [page, setPage] = useState<Page>('dashboard');
@@ -56,6 +63,12 @@ function Root() {
 
   const [booting, setBooting] = useState(true);
   const wasAuthed = useRef(false);
+  const [inviteCode] = useState(readInviteCode);
+
+  // Un utilisateur déjà connecté qui ouvre un lien d'invitation : on nettoie l'URL.
+  useEffect(() => {
+    if (user && inviteCode) window.history.replaceState({}, '', '/');
+  }, [user, inviteCode]);
 
   // Retour de paiement (Lemon Squeezy redirige vers /?merci=1) : on rafraîchit
   // le solde de crédits et on nettoie l'URL.
@@ -109,7 +122,7 @@ function Root() {
         {showLoader ? (
           <BootScreen />
         ) : !user ? (
-          <AuthScreen />
+          inviteCode ? <InviteScreen code={inviteCode} /> : <AuthScreen />
         ) : (
           <AppShell />
         )}
