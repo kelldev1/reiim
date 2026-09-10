@@ -35,6 +35,32 @@ const toUser = (r: RawUser): FriendUser => ({
   avatar: r.avatar ?? undefined,
 });
 
+export interface PublicProfile {
+  id: string;
+  name: string;
+  tag: string;
+  avatar?: string;
+  banner?: string;
+  bio?: string;
+  createdAt: string;
+}
+
+/** Profil public d'un ami (jamais l'e-mail ni les crédits). `null` si non ami. */
+export async function getPublicProfile(id: string): Promise<PublicProfile | null> {
+  const { data, error } = await supabase.rpc('public_profile', { p_user: id });
+  const row = (data as Record<string, unknown>[] | null)?.[0];
+  if (error || !row) return null;
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    tag: row.tag as string,
+    avatar: (row.avatar as string | null) ?? undefined,
+    banner: (row.banner as string | null) ?? undefined,
+    bio: (row.bio as string | null) ?? undefined,
+    createdAt: row.created_at as string,
+  };
+}
+
 export async function findUser(input: string): Promise<FriendUser | null> {
   const p = parseHandle(input);
   if (!p) return null;
