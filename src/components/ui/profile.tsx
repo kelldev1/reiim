@@ -17,7 +17,7 @@ const initials = (name: string) =>
     .join('') || '?';
 
 /** Read an image file, downscale it, return a compact JPEG data-URL. */
-const resizeImage = (file: File, max = 256): Promise<string> =>
+const resizeImage = (file: File, max = 256, quality = 0.82): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('read'));
@@ -34,7 +34,7 @@ const resizeImage = (file: File, max = 256): Promise<string> =>
         const ctx = canvas.getContext('2d');
         if (!ctx) return reject(new Error('canvas'));
         ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', 0.82));
+        resolve(canvas.toDataURL('image/jpeg', quality));
       };
       img.src = reader.result as string;
     };
@@ -68,12 +68,14 @@ const Profile: React.FC<{ className?: string }> = ({ className = '' }) => {
   const { user, logout, updateProfile } = useAuth();
   const { theme, setTheme } = useTheme();
   const fileRef = useRef<HTMLInputElement>(null);
+  const bannerRef = useRef<HTMLInputElement>(null);
 
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [bannerBusy, setBannerBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [tagCopied, setTagCopied] = useState(false);
 
@@ -129,25 +131,80 @@ const Profile: React.FC<{ className?: string }> = ({ className = '' }) => {
     }
   };
 
+  const onBannerFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setErr('Choisis un fichier image.');
+      return;
+    }
+    setBannerBusy(true);
+    try {
+      // bannière large : plus grand côté, compression plus forte (poids maîtrisé).
+      const dataUrl = await resizeImage(file, 1000, 0.72);
+      updateProfile({ banner: dataUrl });
+      setErr(null);
+    } catch {
+      setErr('Impossible de charger cette image.');
+    } finally {
+      setBannerBusy(false);
+    }
+  };
+
   return (
     <div className={`w-full h-full overflow-y-auto ${className}`}>
       <div className="mx-auto w-full max-w-2xl px-4 pb-12">
-        {/* header band */}
-        <div
-          className="relative mt-4 h-28 overflow-hidden rounded-2xl md:h-36"
-          style={{
-            background:
-              'linear-gradient(120deg, rgb(var(--color-fg) / 0.12), rgb(var(--color-fg) / 0.02))',
-          }}
-        >
-          <div
-            aria-hidden
-            className="absolute inset-0"
-            style={{
-              backgroundImage:
-                'radial-gradient(circle at 18% 130%, rgb(var(--color-fg) / 0.14), transparent 45%)',
-            }}
-          />
+        {/* header band / bannière */}
+        <div className="relative mt-4 h-28 overflow-hidden rounded-2xl md:h-36">
+          <button
+            type="button"
+            onClick={() => bannerRef.current?.click()}
+            aria-label="Changer la bannière"
+            className="group absolute inset-0 block h-full w-full"
+          >
+            {user.banner ? (
+              <img src={user.banner} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span
+                className="block h-full w-full"
+                style={{
+                  backgroundImage:
+                    'radial-gradient(circle at 18% 130%, rgb(var(--color-fg) / 0.14), transparent 45%), linear-gradient(120deg, rgb(var(--color-fg) / 0.12), rgb(var(--color-fg) / 0.02))',
+                }}
+              />
+            )}
+            <span
+              className={`absolute inset-0 flex items-center justify-center bg-black/35 transition-opacity ${
+                bannerBusy ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+              }`}
+            >
+              {bannerBusy ? (
+                <Loader variant="spinner" size={22} className="text-white" />
+              ) : (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-white">
+                  <Camera className="h-4 w-4" /> Changer la bannière
+                </span>
+              )}
+            </span>
+          </button>
+
+          {user.banner && !bannerBusy && (
+            <button
+              type="button"
+              onClick={() => updateProfile({ banner: undefined })}
+              aria-label="Retirer la bannière"
+              className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border"
+              style={{
+                backgroundColor: 'rgb(var(--color-surface))',
+                borderColor: 'rgb(var(--color-fg) / 0.15)',
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" style={{ color: 'rgb(239 68 68)' }} />
+            </button>
+          )}
+
+          <input ref={bannerRef} type="file" accept="image/*" hidden onChange={onBannerFile} />
         </div>
 
         {/* avatar + edit toggle */}

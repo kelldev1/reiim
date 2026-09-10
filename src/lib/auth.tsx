@@ -11,6 +11,8 @@ export interface User {
   email: string;
   createdAt: string;
   avatar?: string;
+  /** Image de couverture du profil (data-URL, redimensionnée côté client). */
+  banner?: string;
   bio?: string;
   /** Remaining AI credits (managed server-side). */
   credits: number;
@@ -30,7 +32,7 @@ interface AuthContextValue {
   ) => Promise<{ needsConfirmation: boolean }>;
   logout: () => void;
   updateProfile: (
-    patch: Partial<Pick<User, 'name' | 'email' | 'avatar' | 'bio'>>,
+    patch: Partial<Pick<User, 'name' | 'email' | 'avatar' | 'banner' | 'bio'>>,
   ) => Promise<void>;
   /** Re-read the profile row (e.g. after an AI call spends a credit). */
   refreshProfile: () => Promise<void>;
@@ -44,6 +46,7 @@ type ProfileRow = {
   name: string | null;
   tag: string | null;
   avatar: string | null;
+  banner: string | null;
   bio: string | null;
   credits: number;
   plan: string;
@@ -58,6 +61,7 @@ const toUser = (row: ProfileRow, session: Session): User => ({
   email: row.email ?? session.user.email ?? '',
   createdAt: row.created_at ?? session.user.created_at,
   avatar: row.avatar ?? undefined,
+  banner: row.banner ?? undefined,
   bio: row.bio ?? undefined,
   credits: row.credits ?? 0,
   plan: row.plan ?? 'free',
@@ -166,7 +170,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateProfile = async (
-    patch: Partial<Pick<User, 'name' | 'email' | 'avatar' | 'bio'>>,
+    patch: Partial<Pick<User, 'name' | 'email' | 'avatar' | 'banner' | 'bio'>>,
   ) => {
     if (!user) return;
     setUser({ ...user, ...patch });
@@ -175,6 +179,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (patch.name !== undefined) row.name = patch.name;
     if (patch.email !== undefined) row.email = patch.email;
     if (patch.avatar !== undefined) row.avatar = patch.avatar || null;
+    if (patch.banner !== undefined) row.banner = patch.banner || null;
     if (patch.bio !== undefined) row.bio = patch.bio || null;
     await supabase.from('profiles').update(row).eq('id', user.id);
   };
