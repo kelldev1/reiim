@@ -431,6 +431,32 @@ const Profile: React.FC<{ className?: string }> = ({ className = '' }) => {
               ))}
             </div>
           </Field>
+
+          <Field label="Rappels de devoirs par e-mail">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={user.emailReminders}
+              onClick={() => updateProfile({ emailReminders: !user.emailReminders })}
+              className="relative h-6 w-11 shrink-0 rounded-full transition-colors"
+              style={{
+                backgroundColor: user.emailReminders
+                  ? 'rgb(var(--color-fg))'
+                  : 'rgb(var(--color-fg) / 0.2)',
+              }}
+            >
+              <span
+                className="absolute top-0.5 h-5 w-5 rounded-full transition-transform"
+                style={{
+                  backgroundColor: 'rgb(var(--color-bg))',
+                  transform: user.emailReminders ? 'translateX(22px)' : 'translateX(2px)',
+                }}
+              />
+            </button>
+          </Field>
+          <p className="-mt-2 text-[11px] text-muted-soft">
+            Un rappel 1 semaine, 3 jours et la veille de chaque devoir planifié.
+          </p>
         </div>
 
         {/* logout */}

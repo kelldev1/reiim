@@ -17,3 +17,11 @@ verify_jwt = false
 # La sécurité vient du code d'invitation (128 bits) validé par claim_invite().
 [functions.redeem-invite]
 verify_jwt = false
+
+# Rappels de devoirs : déclenchée par pg_cron. Protégée par X-Cron-Secret.
+[functions.send-reminders]
+verify_jwt = false
+
+# Désinscription des rappels : lien cliqué depuis un e-mail (pas de session).
+[functions.unsubscribe]
+verify_jwt = false

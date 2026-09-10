@@ -9,6 +9,7 @@
 // deno-lint-ignore-file no-explicit-any
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { sendEmail, welcomeEmail } from '../_shared/email.ts';
 
 // Origines autorisées : secret ALLOWED_ORIGINS (liste séparée par des virgules).
 const ALLOWED = (Deno.env.get('ALLOWED_ORIGINS') ?? '')
@@ -122,6 +123,10 @@ Deno.serve(async (req: Request) => {
         () => {},
       );
   }
+
+  // 4. mail de bienvenue (best effort — ne bloque pas la création du compte).
+  const { subject, html } = welcomeEmail(name);
+  void sendEmail({ to: email, subject, html }).catch(() => {});
 
   return json({ ok: true, email }, 200, cors);
 });

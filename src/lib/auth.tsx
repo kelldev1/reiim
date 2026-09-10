@@ -19,6 +19,8 @@ export interface User {
   plan: string;
   /** Autorisé à générer des liens d'invitation (géré côté serveur). */
   canInvite: boolean;
+  /** Reçoit les rappels de devoirs par e-mail. */
+  emailReminders: boolean;
 }
 
 interface AuthContextValue {
@@ -32,7 +34,7 @@ interface AuthContextValue {
   ) => Promise<{ needsConfirmation: boolean }>;
   logout: () => void;
   updateProfile: (
-    patch: Partial<Pick<User, 'name' | 'email' | 'avatar' | 'banner' | 'bio'>>,
+    patch: Partial<Pick<User, 'name' | 'email' | 'avatar' | 'banner' | 'bio' | 'emailReminders'>>,
   ) => Promise<void>;
   /** Re-read the profile row (e.g. after an AI call spends a credit). */
   refreshProfile: () => Promise<void>;
@@ -51,6 +53,7 @@ type ProfileRow = {
   credits: number;
   plan: string;
   can_invite: boolean | null;
+  email_reminders: boolean | null;
   created_at: string;
 };
 
@@ -66,6 +69,7 @@ const toUser = (row: ProfileRow, session: Session): User => ({
   credits: row.credits ?? 0,
   plan: row.plan ?? 'free',
   canInvite: row.can_invite ?? false,
+  emailReminders: row.email_reminders ?? true,
 });
 
 const mapAuthError = (msg: string): string => {
@@ -109,6 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         credits: 0,
         plan: 'free',
         canInvite: false,
+        emailReminders: true,
       });
     }
   };
@@ -170,7 +175,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateProfile = async (
-    patch: Partial<Pick<User, 'name' | 'email' | 'avatar' | 'banner' | 'bio'>>,
+    patch: Partial<Pick<User, 'name' | 'email' | 'avatar' | 'banner' | 'bio' | 'emailReminders'>>,
   ) => {
     if (!user) return;
     setUser({ ...user, ...patch });
@@ -181,6 +186,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (patch.avatar !== undefined) row.avatar = patch.avatar || null;
     if (patch.banner !== undefined) row.banner = patch.banner || null;
     if (patch.bio !== undefined) row.bio = patch.bio || null;
+    if (patch.emailReminders !== undefined) row.email_reminders = patch.emailReminders;
     await supabase.from('profiles').update(row).eq('id', user.id);
   };
 
