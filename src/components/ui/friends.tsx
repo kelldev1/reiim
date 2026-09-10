@@ -118,7 +118,7 @@ const PeekProfile: React.FC<{
           </div>
         ) : (
           <>
-            <div className="relative h-24 md:h-28">
+            <div className="h-24 overflow-hidden md:h-28">
               {profile.banner ? (
                 <img src={profile.banner} alt="" className="h-full w-full object-cover" />
               ) : (
@@ -132,9 +132,9 @@ const PeekProfile: React.FC<{
               )}
             </div>
 
-            <div className="px-5 pb-5">
+            <div className="relative z-10 px-5 pb-5">
               <span
-                className="-mt-8 inline-block rounded-full"
+                className="-mt-8 block w-fit rounded-full"
                 style={{ boxShadow: '0 0 0 4px rgb(var(--color-surface))' }}
               >
                 <Avatar name={profile.name} src={profile.avatar} size={64} />
