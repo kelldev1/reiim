@@ -5,6 +5,9 @@ import {
   CalendarDays,
   CalendarClock,
   CalendarRange,
+  ClipboardList,
+  Timer,
+  BarChart3,
   Sparkles,
   TrendingUp,
   ChevronRight,
@@ -115,7 +118,7 @@ const WeeklyBarChart: React.FC<{ weeks: Week[] }> = ({ weeks }) => {
         {total === 0 && (
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2 pointer-events-none z-10">
             <div className="h-10 w-10 rounded-full ui-border border ui-soft-fill flex items-center justify-center">
-              <CalendarClock className="h-5 w-5 text-muted-soft" />
+              <BarChart3 className="h-5 w-5 text-muted-soft" />
             </div>
             <p className="text-sm text-muted text-center">Rien de planifié pour l'instant</p>
           </div>
@@ -636,7 +639,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onGoToCalendar, className = '' })
                 value={d.list.length}
                 hint="au total"
                 accent="blue"
-                Icon={CalendarDays}
+                Icon={ClipboardList}
               />
               <KpiCard
                 label="À venir"
@@ -650,7 +653,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onGoToCalendar, className = '' })
                 value={d.thisWeek.length}
                 hint="7 prochains jours"
                 accent="emerald"
-                Icon={CalendarRange}
+                Icon={Timer}
               />
               <KpiCard
                 label="Crédits IA"
