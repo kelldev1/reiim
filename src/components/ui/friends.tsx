@@ -83,8 +83,8 @@ const PeekProfile: React.FC<{
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-2xl"
-      style={{ backgroundColor: 'rgb(var(--color-bg) / 0.9)' }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgb(0 0 0 / 0.35)' }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       onClick={onClose}
