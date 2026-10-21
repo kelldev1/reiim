@@ -30,8 +30,7 @@ temps réel).
 | Vidéos | Proxy Edge Function → YouTube Data API v3 |
 
 Tout le détail d'infra (migrations, secrets, déploiement des fonctions) est dans
-**`SETUP.md`**. L'état d'avancement et les décisions produit sont dans
-**`consigne/ETAT-DES-LIEUX.md`**.
+**`SETUP.md`**. 
 
 ## Démarrer en local
 
